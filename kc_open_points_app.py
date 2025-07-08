@@ -212,6 +212,7 @@ def closed_topics():
 
 # Page routing
 st.set_page_config(page_title="K-C Tracker", layout="wide")
+
 if st.session_state.page == "home":
     home()
 elif st.session_state.page == "submit":
