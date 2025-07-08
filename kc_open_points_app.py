@@ -11,7 +11,7 @@ def load_data():
     if os.path.exists(CSV_FILE):
         return pd.read_csv(CSV_FILE)
     else:
-        return pd.DataFrame(columns=["Topic", "Owner", "Status", "Resolution Date", "Closing Comment", "Closed By"])
+        return pd.DataFrame(columns=["Topic", "Owner", "Status", "Target Resolution Date", "Closing Comment", "Closed By"])
 
 # Save updated data to CSV
 def save_data(df):
@@ -28,7 +28,7 @@ if page == "Submit Your Request":
         topic = st.text_input("Topic")
         owner = st.text_input("Owner")
         status = st.text_input("Status")
-        resolution_date = st.date_input("Resolution Date", format="YYYY-MM-DD")
+        resolution_date = st.date_input("Target Resolution Date", format="YYYY-MM-DD")
 
         submitted = st.form_submit_button("Submit")
 
@@ -77,6 +77,6 @@ elif page == "Closed Topics":
     closed_df = df[df["Status"].str.lower() == "closed"]
 
     if not closed_df.empty:
-        st.dataframe(closed_df[["Topic", "Owner", "Resolution Date", "Closed By", "Closing Comment"]], use_container_width=True)
+        st.dataframe(closed_df[["Topic", "Owner", "Target Resolution Date", "Closed By", "Closing Comment"]], use_container_width=True)
     else:
         st.info("No closed topics available.")
