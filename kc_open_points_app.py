@@ -6,16 +6,26 @@ from datetime import date
 # CSV file name
 CSV_FILE = "kc_open_points.csv"
 
-# Load data from CSV
+# Required columns
+REQUIRED_COLUMNS = [
+    "Topic", "Owner", "Status", "Actual Resolution Date",
+    "Closing Comment", "Closed By"
+]
+
+# Load data from CSV and ensure all required columns exist
 @st.cache_data
 def load_data():
     if os.path.exists(CSV_FILE):
-        return pd.read_csv(CSV_FILE)
+        df = pd.read_csv(CSV_FILE)
     else:
-        return pd.DataFrame(columns=[
-            "Topic", "Owner", "Status", "Resolution Date",
-            "Closing Comment", "Closed By", "Actual Resolution Date"
-        ])
+        df = pd.DataFrame(columns=REQUIRED_COLUMNS)
+
+    # Add any missing columns
+    for col in REQUIRED_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+
+    return df[REQUIRED_COLUMNS]
 
 # Save updated data to CSV
 def save_data(df):
@@ -32,7 +42,7 @@ if page == "Submit Your Request":
         topic = st.text_input("Topic")
         owner = st.text_input("Owner")
         status = st.text_input("Status")
-        resolution_date = st.date_input("Resolution Date", format="YYYY-MM-DD")
+        actual_resolution_date = st.date_input("Planned Resolution Date", format="YYYY-MM-DD")
 
         submitted = st.form_submit_button("Submit")
 
@@ -41,12 +51,14 @@ if page == "Submit Your Request":
                 "Topic": topic,
                 "Owner": owner,
                 "Status": status,
-                "Resolution Date": resolution_date,
+                "Actual Resolution Date": actual_resolution_date,
                 "Closing Comment": "",
-                "Closed By": "",
-                "Actual Resolution Date": ""
+                "Closed By": ""
             }])
-            new_entry.to_csv(CSV_FILE, mode='a', header=not os.path.exists(CSV_FILE), index=False)
+            if os.path.exists(CSV_FILE):
+                new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
+            else:
+                new_entry.to_csv(CSV_FILE, index=False)
             st.success("✅ Entry submitted successfully!")
 
 elif page == "Open Points":
@@ -59,7 +71,7 @@ elif page == "Open Points":
             with st.expander(f"🔹 {row['Topic']}"):
                 st.write(f"**Owner:** {row['Owner']}")
                 st.write(f"**Status:** {row['Status']}")
-                st.write(f"**Resolution Date:** {row['Resolution Date']}")
+                st.write(f"**Planned Resolution Date:** {row['Actual Resolution Date']}")
                 with st.form(f"close_form_{i}"):
                     closing_comment = st.text_area("Closing Comment", key=f"comment_{i}")
                     closed_by = st.text_input("Closed By", key=f"closedby_{i}")
@@ -82,8 +94,8 @@ elif page == "Closed Topics":
 
     if not closed_df.empty:
         st.dataframe(closed_df[[
-            "Topic", "Owner", "Resolution Date",
-            "Actual Resolution Date", "Closed By", "Closing Comment"
+            "Topic", "Owner", "Actual Resolution Date",
+            "Closed By", "Closing Comment"
         ]], use_container_width=True)
     else:
         st.info("No closed topics available.")
