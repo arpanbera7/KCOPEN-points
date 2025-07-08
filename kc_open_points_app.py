@@ -40,6 +40,28 @@ if "close_row" not in st.session_state:
 if "edit_row" not in st.session_state:
     st.session_state.edit_row = None
 
+def nav_buttons():
+    col1, col2 = st.columns([1,1])
+    with col1:
+        if st.button("🏠 Home"):
+            # Update state and rerun here
+            st.session_state.page = "home"
+            st.session_state.history = []
+            st.session_state.edit_row = None
+            st.session_state.close_row = None
+            st.experimental_rerun()
+    with col2:
+        if st.button("🔙 Back"):
+            if st.session_state.history:
+                previous = st.session_state.history.pop()
+                st.session_state.page = previous
+            else:
+                st.session_state.page = "home"
+                st.session_state.history = []
+            st.session_state.edit_row = None
+            st.session_state.close_row = None
+            st.experimental_rerun()
+
 def navigate_to(page):
     if st.session_state.page != page:
         if st.session_state.page != "home":
@@ -48,32 +70,6 @@ def navigate_to(page):
         st.session_state.close_row = None
         st.session_state.page = page
         st.experimental_rerun()
-
-def go_back():
-    if st.session_state.history:
-        previous = st.session_state.history.pop()
-        st.session_state.edit_row = None
-        st.session_state.close_row = None
-        st.session_state.page = previous
-        st.experimental_rerun()
-    else:
-        go_home()
-
-def go_home():
-    st.session_state.page = "home"
-    st.session_state.history = []
-    st.session_state.edit_row = None
-    st.session_state.close_row = None
-    st.experimental_rerun()
-
-def nav_buttons():
-    col1, col2 = st.columns([1,1])
-    with col1:
-        if st.button("🏠 Home"):
-            go_home()
-    with col2:
-        if st.button("🔙 Back"):
-            go_back()
 
 def home():
     st.markdown("<h1 style='color:#0073e6;'>📘 K-C Issue Tracker</h1>", unsafe_allow_html=True)
