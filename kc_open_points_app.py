@@ -59,29 +59,6 @@ def home():
     if st.button("✅ Closed Topics"):
         st.session_state.page = "closed"
         st.rerun()
-
-def submit_request():
-    st.markdown("### 📝 Submit Your Request\n", unsafe_allow_html=True)
-    nav_buttons()
-    with st.form("entry_form"):
-        topic = st.text_input("Topic")
-        owner = st.text_input("Owner")
-        status = st.text_input("Status")
-        target_resolution_date = st.date_input("Target Resolution Date", format="YYYY-MM-DD")
-        submitted = st.form_submit_button("Submit")
-        if submitted:
-            new_entry = pd.DataFrame([{
-                "Topic": topic,
-                "Owner": owner,
-                "Status": status,
-                "Target Resolution Date": target_resolution_date,
-                "Closing Comment": "",
-                "Closed By": "",
-                "Actual Resolution Date": ""
-            }])
-            new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
-            st.success("✅ Entry submitted successfully!")
-
 def open_topics():
     st.markdown("### 📌 Open Topics\n", unsafe_allow_html=True)
     nav_buttons()
@@ -121,7 +98,6 @@ def open_topics():
                         st.markdown("**🔒 Provide Closing Details**")
                         comment = st.text_area("Closing Comment", key=f"comment_{i}")
                         closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
-                        col_submit, col_cancel = st.columns([1, 1])
                         if st.form_submit_button("Confirm Close"):
                             df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
                             df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = comment
@@ -131,9 +107,6 @@ def open_topics():
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
                             st.session_state.close_row = None
                             st.rerun()
-                        if st.form_submit_button("Cancel"):
-                            st.session_state.close_row = None
-                            st.rerun()
 
                 if st.session_state.edit_row == i:
                     with st.form(f"edit_form_{i}"):
@@ -141,10 +114,14 @@ def open_topics():
                         new_topic = st.text_input("Topic", value=row["Topic"], key=f"edit_topic_{i}")
                         new_owner = st.text_input("Owner", value=row["Owner"], key=f"edit_owner_{i}")
                         new_status = st.text_input("Status", value=row["Status"], key=f"edit_status_{i}")
-                        new_date = st.date_input("Target Resolution Date", value=pd.to_datetime(row["Target Resolution Date"]), key=f"edit_date_{i}")
-                        submitted = st.form_submit_button("Save Changes")
-                        cancelled = st.form_submit_button("Cancel")
-                        if submitted:
+                        try:
+                            default_date = pd.to_datetime(row["Target Resolution Date"], errors="coerce")
+                        except Exception:
+                            default_date = pd.Timestamp.today()
+                        if pd.isnull(default_date):
+                            default_date = pd.Timestamp.today()
+                        new_date = st.date_input("Target Resolution Date", value=default_date, key=f"edit_date_{i}")
+                        if st.form_submit_button("Save Changes"):
                             df.loc[df["Topic"] == row["Topic"], "Topic"] = new_topic
                             df.loc[df["Topic"] == new_topic, "Owner"] = new_owner
                             df.loc[df["Topic"] == new_topic, "Status"] = new_status
@@ -153,10 +130,6 @@ def open_topics():
                             st.success(f"✅ '{new_topic}' updated successfully.")
                             st.session_state.edit_row = None
                             st.rerun()
-                        if cancelled:
-                            st.session_state.edit_row = None
-                            st.rerun()
-
         csv = open_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="⬇️ Download Open Topics as CSV",
