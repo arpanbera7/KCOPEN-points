@@ -48,7 +48,7 @@ def style_table(df):
 st.set_page_config(page_title="K-C Tracker", layout="wide")
 st.title("📊 K-C Tracker")
 
-page = st.sidebar.selectbox("Navigate", ["Submit Request", "Open Topics", "Closed Topics"])
+page = st.selectbox("Navigate", ["Submit Request", "Open Topics", "Closed Topics"])
 df = load_data()
 
 if page == "Submit Request":
