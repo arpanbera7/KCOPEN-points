@@ -16,7 +16,7 @@ def load_data():
     if os.path.exists(CSV_FILE):
         df = pd.read_csv(CSV_FILE)
     else:
-        df = pd.read_excel(EXCEL_FILE, sheet_name=0, engine="openpyxl")
+        df = pd.read_excel(EXCEL_FILE, engine="openpyxl")
         df.rename(columns={"Resolution Date": "Target Resolution Date"}, inplace=True)
         df["Closing Comment"] = ""
         df["Closed By"] = ""
@@ -30,63 +30,60 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
+# Initialize session state variables
 if "page" not in st.session_state:
     st.session_state.page = "home"
 if "history" not in st.session_state:
     st.session_state.history = []
+if "next_page" not in st.session_state:
+    st.session_state.next_page = None
 if "close_row" not in st.session_state:
     st.session_state.close_row = None
 if "edit_row" not in st.session_state:
     st.session_state.edit_row = None
 
+# Navigation helper - sets the next_page but does NOT rerun immediately
+def request_navigation(page):
+    if st.session_state.page != page:
+        # Keep track of history for back button, but only if not home
+        if st.session_state.page != "home":
+            st.session_state.history.append(st.session_state.page)
+        st.session_state.edit_row = None
+        st.session_state.close_row = None
+        st.session_state.next_page = page
+
 def nav_buttons():
-    col1, col2 = st.columns([1,1])
+    col1, col2 = st.columns(2)
     with col1:
         if st.button("🏠 Home"):
-            if st.session_state.page != "home":
-                st.session_state.history = []
-                st.session_state.edit_row = None
-                st.session_state.close_row = None
-                st.session_state.page = "home"
-                st.experimental_rerun()
+            request_navigation("home")
     with col2:
         if st.button("🔙 Back"):
             if st.session_state.history:
-                st.session_state.page = st.session_state.history.pop()
-                st.session_state.edit_row = None
-                st.session_state.close_row = None
-                st.experimental_rerun()
+                prev_page = st.session_state.history.pop()
+                request_navigation(prev_page)
             else:
-                if st.session_state.page != "home":
-                    st.session_state.page = "home"
-                    st.session_state.edit_row = None
-                    st.session_state.close_row = None
-                    st.experimental_rerun()
+                request_navigation("home")
 
 def home():
-    st.markdown("<h1 style='color:#0073e6;'>📘 K-C Issue Tracker</h1>", unsafe_allow_html=True)
-    st.markdown("Welcome! Please choose an option below:")
+    st.title("📘 K-C Issue Tracker")
+    st.write("Welcome! Please choose an option below:")
 
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("📝 Submit Request"):
-            st.session_state.history.append(st.session_state.page)
-            st.session_state.page = "submit"
-            st.experimental_rerun()
+            request_navigation("submit")
     with col2:
         if st.button("📌 Open Topics"):
-            st.session_state.history.append(st.session_state.page)
-            st.session_state.page = "open"
-            st.experimental_rerun()
+            request_navigation("open")
     with col3:
         if st.button("✅ Closed Topics"):
-            st.session_state.history.append(st.session_state.page)
-            st.session_state.page = "closed"
-            st.experimental_rerun()
+            request_navigation("closed")
 
 def submit_request():
-    st.markdown("<h2 style='color:#0073e6;'>📝 Submit Your Request</h2>", unsafe_allow_html=True)
+    st.header("📝 Submit Your Request")
     nav_buttons()
+
     with st.form("entry_form"):
         topic = st.text_input("Topic")
         owner = st.text_input("Owner")
@@ -118,7 +115,7 @@ def safe_to_date(val):
         return date.today()
 
 def open_topics():
-    st.markdown("<h2 style='color:#0073e6;'>📌 Open Topics</h2>", unsafe_allow_html=True)
+    st.header("📌 Open Topics")
     nav_buttons()
 
     df = load_data()
@@ -173,7 +170,7 @@ def open_topics():
                             save_data(df)
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
                         st.session_state.close_row = None
-                        st.experimental_rerun()
+                        request_navigation("open")
 
             if st.session_state.edit_row == i:
                 with st.form(f"edit_form_{i}"):
@@ -197,19 +194,17 @@ def open_topics():
                             save_data(df)
                             st.success(f"✅ '{new_topic}' updated successfully.")
                         st.session_state.edit_row = None
-                        st.experimental_rerun()
+                        request_navigation("open")
 
             st.markdown("</div>", unsafe_allow_html=True)
 
     if clicked_close is not None:
         st.session_state.close_row = clicked_close
         st.session_state.edit_row = None
-        st.experimental_rerun()
 
     if clicked_edit is not None:
         st.session_state.edit_row = clicked_edit
         st.session_state.close_row = None
-        st.experimental_rerun()
 
     csv = open_df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -220,28 +215,40 @@ def open_topics():
     )
 
 def closed_topics():
-    st.markdown("<h2 style='color:#0073e6;'>✅ Closed Topics</h2>", unsafe_allow_html=True)
+    st.header("✅ Closed Topics")
     nav_buttons()
+
     df = load_data()
     closed_df = df[df["Status"].str.lower() == "closed"]
-    if not closed_df.empty:
-        st.dataframe(closed_df[[
+
+    if closed_df.empty:
+        st.info("No closed topics available.")
+        return
+
+    st.dataframe(
+        closed_df[[
             "Topic", "Owner", "Target Resolution Date",
             "Actual Resolution Date", "Closed By", "Closing Comment"
-        ]], use_container_width=True)
+        ]],
+        use_container_width=True,
+    )
 
-        csv = closed_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="⬇️ Download Closed Topics as CSV",
-            data=csv,
-            file_name='closed_topics.csv',
-            mime='text/csv'
-        )
-    else:
-        st.info("No closed topics available.")
+    csv = closed_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="⬇️ Download Closed Topics as CSV",
+        data=csv,
+        file_name='closed_topics.csv',
+        mime='text/csv'
+    )
 
+# At the end of script, check if we have a navigation request
+if st.session_state.next_page is not None:
+    st.session_state.page = st.session_state.next_page
+    st.session_state.next_page = None
+    st.experimental_rerun()
+
+# Main routing
 st.set_page_config(page_title="K-C Tracker", layout="wide")
-
 if st.session_state.page == "home":
     home()
 elif st.session_state.page == "submit":
