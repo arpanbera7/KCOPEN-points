@@ -98,7 +98,7 @@ def submit_request():
             new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success("✅ Entry submitted successfully!")
 
-# Open Topics Page
+# Open Topics Page with row-wise close buttons and download
 def open_topics():
     st.markdown("<h2 style='color:#0073e6;'>📌 Open Topics</h2>", unsafe_allow_html=True)
     nav_buttons()
@@ -106,30 +106,39 @@ def open_topics():
     open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
     if not open_df.empty:
-        st.dataframe(style_table(open_df[[
-            "Topic", "Owner", "Status", "Target Resolution Date"
-        ]]), use_container_width=True)
+        st.markdown("### 🗂️ Topics List")
+        for i, row in open_df.iterrows():
+            cols = st.columns([3, 2, 2, 3, 2])
+            cols[0].markdown(f"**{row['Topic']}**")
+            cols[1].markdown(row["Owner"])
+            cols[2].markdown(row["Status"])
+            cols[3].markdown(row["Target Resolution Date"])
+            with cols[4]:
+                with st.form(f"close_form_{i}"):
+                    closing_comment = st.text_input("Comment", key=f"comment_{i}")
+                    closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
+                    close_submit = st.form_submit_button("Close")
+                    if close_submit:
+                        df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
+                        df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = closing_comment
+                        df.loc[df["Topic"] == row["Topic"], "Closed By"] = closed_by
+                        df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
+                        save_data(df)
+                        st.success(f"✅ '{row['Topic']}' marked as Closed.")
+                        st.rerun()
 
-        st.subheader("🔒 Close a Topic")
-        selected_topic = st.selectbox("Select a topic to close", open_df["Topic"].tolist())
-
-        with st.form("close_form"):
-            closing_comment = st.text_area("Closing Comment")
-            closed_by = st.text_input("Closed By")
-            close_submit = st.form_submit_button("Mark as Closed")
-
-            if close_submit:
-                df.loc[df["Topic"] == selected_topic, "Status"] = "Closed"
-                df.loc[df["Topic"] == selected_topic, "Closing Comment"] = closing_comment
-                df.loc[df["Topic"] == selected_topic, "Closed By"] = closed_by
-                df.loc[df["Topic"] == selected_topic, "Actual Resolution Date"] = date.today().isoformat()
-                save_data(df)
-                st.success(f"✅ '{selected_topic}' marked as Closed.")
-                st.rerun()
+        # Download Open Topics
+        csv = open_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="⬇️ Download Open Topics as CSV",
+            data=csv,
+            file_name='open_topics.csv',
+            mime='text/csv'
+        )
     else:
         st.info("No open topics available.")
 
-# Closed Topics Page
+# Closed Topics Page with download
 def closed_topics():
     st.markdown("<h2 style='color:#0073e6;'>✅ Closed Topics</h2>", unsafe_allow_html=True)
     nav_buttons()
@@ -140,6 +149,15 @@ def closed_topics():
             "Topic", "Owner", "Target Resolution Date",
             "Actual Resolution Date", "Closed By", "Closing Comment"
         ]]), use_container_width=True)
+
+        # Download Closed Topics
+        csv = closed_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="⬇️ Download Closed Topics as CSV",
+            data=csv,
+            file_name='closed_topics.csv',
+            mime='text/csv'
+        )
     else:
         st.info("No closed topics available.")
 
