@@ -12,7 +12,6 @@ REQUIRED_COLUMNS = [
     "Closing Comment", "Closed By", "Actual Resolution Date"
 ]
 
-# Load data
 @st.cache_data
 def load_data():
     if os.path.exists(CSV_FILE):
@@ -32,21 +31,23 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# Load users
 @st.cache_data
 def load_users():
     if os.path.exists(USER_FILE):
         return pd.read_csv(USER_FILE)
     else:
+        # default users
         return pd.DataFrame([
             {"username": "admin", "password": "admin", "role": "admin"},
-            {"username": "user", "password": "user", "role": "user"}
+            {"username": "user", "password": "user", "role": "user"},
         ])
 
 # Initialize session state
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+if "username" not in st.session_state:
     st.session_state.username = ""
+if "role" not in st.session_state:
     st.session_state.role = ""
 if "page" not in st.session_state:
     st.session_state.page = "home"
@@ -55,9 +56,9 @@ if "close_row" not in st.session_state:
 if "edit_row" not in st.session_state:
     st.session_state.edit_row = None
 
-# Login function
 def login():
     st.sidebar.title("🔐 Login")
+
     if not st.session_state.logged_in:
         username = st.sidebar.text_input("Username")
         password = st.sidebar.text_input("Password", type="password")
@@ -68,10 +69,11 @@ def login():
                 st.session_state.logged_in = True
                 st.session_state.username = username
                 st.session_state.role = user_row.iloc[0]["role"]
-                st.experimental_rerun()
+                st.experimental_rerun()  # rerun after login success
             else:
                 st.sidebar.error("❌ Invalid username or password")
-        st.stop()
+        st.stop()  # stop rendering app until logged in
+
     else:
         st.sidebar.success(f"👤 {st.session_state.username} ({st.session_state.role})")
         if st.sidebar.button("Logout"):
@@ -81,27 +83,24 @@ def login():
             st.session_state.page = "home"
             st.experimental_rerun()
 
-# Navigation buttons
 def nav_buttons():
-    cols = st.columns([1,1])
-    with cols[0]:
+    col1, col2 = st.columns(2)
+    with col1:
         if st.button("🏠 Home"):
             st.session_state.page = "home"
             st.session_state.close_row = None
             st.session_state.edit_row = None
             st.experimental_rerun()
-    with cols[1]:
+    with col2:
         if st.button("🔙 Back"):
-            # For simplicity, all back goes to home
             st.session_state.page = "home"
             st.session_state.close_row = None
             st.session_state.edit_row = None
             st.experimental_rerun()
 
-# Pages
 def home():
     st.title("📘 K-C Issue Tracker")
-    st.write("Welcome! Please choose an option:")
+    st.write("Choose an option:")
     if st.button("📝 Submit Request"):
         st.session_state.page = "submit"
         st.experimental_rerun()
@@ -113,7 +112,7 @@ def home():
         st.experimental_rerun()
 
 def submit_request():
-    st.header("📝 Submit Your Request")
+    st.header("📝 Submit Request")
     nav_buttons()
     with st.form("submit_form"):
         topic = st.text_input("Topic")
@@ -134,7 +133,7 @@ def submit_request():
             }])
             df = pd.concat([df, new_entry], ignore_index=True)
             save_data(df)
-            st.success("✅ Entry submitted successfully!")
+            st.success("✅ Entry submitted!")
 
 def open_topics():
     st.header("📌 Open Topics")
@@ -146,12 +145,11 @@ def open_topics():
         st.info("No open topics.")
         return
 
-    st.markdown("### Open Topics Table")
     header_cols = st.columns([3,2,2,3,1,1])
     header_cols[0].markdown("**Topic**")
     header_cols[1].markdown("**Owner**")
     header_cols[2].markdown("**Status**")
-    header_cols[3].markdown("**Target Resolution Date**")
+    header_cols[3].markdown("**Target Date**")
     header_cols[4].markdown("**Close**")
     header_cols[5].markdown("**Edit**")
 
@@ -215,14 +213,6 @@ def open_topics():
                     st.session_state.edit_row = None
                     st.experimental_rerun()
 
-    csv = open_df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        "Download Open Topics CSV",
-        csv,
-        file_name="open_topics.csv",
-        mime="text/csv"
-    )
-
 def closed_topics():
     st.header("✅ Closed Topics")
     nav_buttons()
@@ -245,7 +235,6 @@ def closed_topics():
         mime="text/csv"
     )
 
-# Main app
 st.set_page_config(page_title="K-C Tracker", layout="wide")
 
 login()
