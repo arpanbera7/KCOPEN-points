@@ -41,8 +41,6 @@ def safe_to_date(val):
     except Exception:
         return date.today()
 
-# Page functions
-
 def home():
     st.title("📘 K-C Issue Tracker")
     st.write("Welcome! Use the sidebar to navigate between pages.")
@@ -106,7 +104,10 @@ def open_topics():
                     comment = st.text_area("Closing Comment", key=f"comment_{i}")
                     closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
                     action = st.radio("Action", ["Confirm Close", "Cancel"], key=f"close_action_{i}")
-                    submitted = st.form_submit_button("Submit")
+
+                    btn_label = "Close Ticket" if action == "Confirm Close" else "Cancel"
+                    submitted = st.form_submit_button(btn_label)
+
                     if submitted:
                         if action == "Confirm Close":
                             df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
@@ -115,7 +116,8 @@ def open_topics():
                             df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                             save_data(df)
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
-                        # Close dialog on Confirm or Cancel
+                        else:
+                            st.info("Close operation cancelled.")
                         st.session_state.close_row = None
 
             # Edit dialog
@@ -131,7 +133,10 @@ def open_topics():
                         key=f"edit_date_{i}"
                     )
                     action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
-                    submitted = st.form_submit_button("Submit")
+
+                    btn_label = "Save Changes" if action == "Save Changes" else "Cancel"
+                    submitted = st.form_submit_button(btn_label)
+
                     if submitted:
                         if action == "Save Changes":
                             df.loc[df["Topic"] == row["Topic"], "Topic"] = new_topic
@@ -140,7 +145,8 @@ def open_topics():
                             df.loc[df["Topic"] == new_topic, "Target Resolution Date"] = new_date
                             save_data(df)
                             st.success(f"✅ '{new_topic}' updated successfully.")
-                        # Close dialog on Save or Cancel
+                        else:
+                            st.info("Edit operation cancelled.")
                         st.session_state.edit_row = None
 
             st.markdown("</div>", unsafe_allow_html=True)
