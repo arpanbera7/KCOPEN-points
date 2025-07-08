@@ -25,7 +25,7 @@ def load_data():
     for col in REQUIRED_COLUMNS:
         if col not in df.columns:
             df[col] = ""
-    df["row_id"] = range(len(df))  # in-memory unique id
+    df["row_id"] = range(len(df))  # unique row id for editing
     return df
 
 def save_data(df):
@@ -69,23 +69,32 @@ def login():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.role = ""
+        st.session_state.login_attempted = False  # To control rerun
 
     users_df = load_users()
 
     if not st.session_state.logged_in:
         username = st.sidebar.text_input("Username")
         password = st.sidebar.text_input("Password", type="password")
-        if st.sidebar.button("Login"):
+        login_clicked = st.sidebar.button("Login")
+
+        if login_clicked:
             user_row = users_df[users_df["username"] == username]
             if not user_row.empty and user_row.iloc[0]["password"] == password:
                 st.session_state.logged_in = True
                 st.session_state.username = username
                 st.session_state.role = user_row.iloc[0]["role"]
-                st.sidebar.success(f"✅ Welcome, {username}")
-                st.experimental_rerun()
             else:
                 st.sidebar.error("❌ Invalid username or password")
-        st.stop()  # Stop further execution until login
+
+            st.session_state.login_attempted = True
+
+        if st.session_state.login_attempted:
+            st.session_state.login_attempted = False
+            st.experimental_rerun()
+
+        st.stop()  # Stop here until logged in
+
     else:
         st.sidebar.info(f"👤 {st.session_state.username} ({st.session_state.role})")
         if st.sidebar.button("Logout"):
