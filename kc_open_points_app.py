@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import date
+from datetime import date, datetime
 
 EXCEL_FILE = "KC Open Points.xlsx"
 CSV_FILE = "kc_open_points.csv"
@@ -83,7 +83,11 @@ def submit_request():
             new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success("✅ Entry submitted successfully!")
 
-def safe_to_datetime(date_val):
+def safe_to_date(date_val):
+    if isinstance(date_val, (datetime, pd.Timestamp)):
+        return date_val.date()
+    if isinstance(date_val, date):
+        return date_val
     try:
         dt = pd.to_datetime(date_val, errors='coerce')
         if pd.isna(dt):
@@ -147,7 +151,6 @@ def open_topics():
                                 save_data(df)
                                 st.success(f"✅ '{row['Topic']}' marked as Closed.")
                             st.session_state.close_row = None
-                            # No st.experimental_rerun() here
 
                 if st.session_state.edit_row == i:
                     with st.form(f"edit_form_{i}"):
@@ -157,7 +160,7 @@ def open_topics():
                         new_status = st.text_input("Status", value=row["Status"], key=f"edit_status_{i}")
                         new_date = st.date_input(
                             "Target Resolution Date",
-                            value=safe_to_datetime(row["Target Resolution Date"]),
+                            value=safe_to_date(row["Target Resolution Date"]),
                             key=f"edit_date_{i}"
                         )
                         action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
@@ -172,7 +175,6 @@ def open_topics():
                                 save_data(df)
                                 st.success(f"✅ '{new_topic}' updated successfully.")
                             st.session_state.edit_row = None
-                            # No st.experimental_rerun() here
 
                 st.markdown("</div>", unsafe_allow_html=True)
 
