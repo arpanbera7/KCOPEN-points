@@ -29,7 +29,7 @@ def load_data():
 
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
-    st.cache_data.clear()  # Ensure fresh reload
+    st.cache_data.clear()
 
 def safe_to_date(val):
     try:
@@ -101,10 +101,11 @@ def open_topics():
                     submit_close = st.form_submit_button("Submit")
                     if submit_close:
                         if action == "Confirm Close":
-                            df.at[i, "Status"] = "Closed"
-                            df.at[i, "Closing Comment"] = comment
-                            df.at[i, "Closed By"] = closed_by
-                            df.at[i, "Actual Resolution Date"] = date.today()
+                            original_index = df[df["Topic"] == row["Topic"]].index[0]
+                            df.at[original_index, "Status"] = "Closed"
+                            df.at[original_index, "Closing Comment"] = comment
+                            df.at[original_index, "Closed By"] = closed_by
+                            df.at[original_index, "Actual Resolution Date"] = date.today()
                             save_data(df)
                             st.success("✅ Topic closed successfully.")
                         st.session_state.close_row = None
@@ -121,10 +122,11 @@ def open_topics():
                     submit_edit = st.form_submit_button("Submit")
                     if submit_edit:
                         if action == "Save Changes":
-                            df.at[i, "Topic"] = new_topic
-                            df.at[i, "Owner"] = new_owner
-                            df.at[i, "Status"] = new_status
-                            df.at[i, "Target Resolution Date"] = new_date
+                            original_index = df[df["Topic"] == row["Topic"]].index[0]
+                            df.at[original_index, "Topic"] = new_topic
+                            df.at[original_index, "Owner"] = new_owner
+                            df.at[original_index, "Status"] = new_status
+                            df.at[original_index, "Target Resolution Date"] = new_date
                             save_data(df)
                             st.success("✅ Changes saved.")
                         st.session_state.edit_row = None
