@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+from datetime import date
 
 # CSV file name
 CSV_FILE = "kc_open_points.csv"
@@ -11,7 +12,10 @@ def load_data():
     if os.path.exists(CSV_FILE):
         return pd.read_csv(CSV_FILE)
     else:
-        return pd.DataFrame(columns=["Topic", "Owner", "Status", "Target Resolution Date", "Closing Comment", "Closed By"])
+        return pd.DataFrame(columns=[
+            "Topic", "Owner", "Status", "Resolution Date",
+            "Closing Comment", "Closed By", "Actual Resolution Date"
+        ])
 
 # Save updated data to CSV
 def save_data(df):
@@ -28,7 +32,7 @@ if page == "Submit Your Request":
         topic = st.text_input("Topic")
         owner = st.text_input("Owner")
         status = st.text_input("Status")
-        resolution_date = st.date_input("Target Resolution Date", format="YYYY-MM-DD")
+        resolution_date = st.date_input("Resolution Date", format="YYYY-MM-DD")
 
         submitted = st.form_submit_button("Submit")
 
@@ -39,7 +43,8 @@ if page == "Submit Your Request":
                 "Status": status,
                 "Resolution Date": resolution_date,
                 "Closing Comment": "",
-                "Closed By": ""
+                "Closed By": "",
+                "Actual Resolution Date": ""
             }])
             new_entry.to_csv(CSV_FILE, mode='a', header=not os.path.exists(CSV_FILE), index=False)
             st.success("✅ Entry submitted successfully!")
@@ -47,27 +52,26 @@ if page == "Submit Your Request":
 elif page == "Open Points":
     st.title("📌 KC Open Points - Open Topics")
     df = load_data()
-    open_df = df[df["Status"].str.lower() != "closed"]
+    open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
     if not open_df.empty:
-        st.dataframe(open_df, use_container_width=True)
-
-        st.subheader("🔄 Mark Topic as Closed")
-        topic_list = open_df["Topic"].tolist()
-        selected_topic = st.selectbox("Select Topic to mark as Closed", topic_list)
-
-        with st.form("close_form"):
-            closing_comment = st.text_area("Closing Comment")
-            closed_by = st.text_input("Closed By")
-            close_submit = st.form_submit_button("Mark as Closed")
-
-            if close_submit:
-                df.loc[df["Topic"] == selected_topic, "Status"] = "Closed"
-                df.loc[df["Topic"] == selected_topic, "Closing Comment"] = closing_comment
-                df.loc[df["Topic"] == selected_topic, "Closed By"] = closed_by
-                save_data(df)
-                st.success(f"✅ '{selected_topic}' marked as Closed.")
-                st.dataframe(df[df["Status"].str.lower() != "closed"], use_container_width=True)
+        for i, row in open_df.iterrows():
+            with st.expander(f"🔹 {row['Topic']}"):
+                st.write(f"**Owner:** {row['Owner']}")
+                st.write(f"**Status:** {row['Status']}")
+                st.write(f"**Resolution Date:** {row['Resolution Date']}")
+                with st.form(f"close_form_{i}"):
+                    closing_comment = st.text_area("Closing Comment", key=f"comment_{i}")
+                    closed_by = st.text_input("Closed By", key=f"closedby_{i}")
+                    close_submit = st.form_submit_button("Mark as Closed")
+                    if close_submit:
+                        df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
+                        df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = closing_comment
+                        df.loc[df["Topic"] == row["Topic"], "Closed By"] = closed_by
+                        df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
+                        save_data(df)
+                        st.success(f"✅ '{row['Topic']}' marked as Closed.")
+                        st.experimental_rerun()
     else:
         st.info("No open topics available.")
 
@@ -77,6 +81,9 @@ elif page == "Closed Topics":
     closed_df = df[df["Status"].str.lower() == "closed"]
 
     if not closed_df.empty:
-        st.dataframe(closed_df[["Topic", "Owner", "Target Resolution Date", "Closed By", "Closing Comment"]], use_container_width=True)
+        st.dataframe(closed_df[[
+            "Topic", "Owner", "Resolution Date",
+            "Actual Resolution Date", "Closed By", "Closing Comment"
+        ]], use_container_width=True)
     else:
         st.info("No closed topics available.")
