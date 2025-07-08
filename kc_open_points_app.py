@@ -13,7 +13,7 @@ REQUIRED_COLUMNS = [
     "Closing Comment", "Closed By", "Actual Resolution Date"
 ]
 
-# Load data from Excel or CSV
+# Load data
 @st.cache_data
 def load_data():
     if os.path.exists(CSV_FILE):
@@ -30,29 +30,54 @@ def load_data():
             df[col] = ""
     return df[REQUIRED_COLUMNS]
 
-# Save updated data to CSV
+# Save data
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# Apply styling to DataFrame
+# Style table
 def style_table(df):
     return df.style.set_properties(**{
         'background-color': '#f9f9f9',
         'color': '#333',
         'border-color': 'gray'
-    }).set_table_styles([
-        {'selector': 'thead th', 'props': [('background-color', '#4CAF50'), ('color', 'white'), ('font-weight', 'bold')]}
-    ]).apply(lambda x: ['background-color: #f2f2f2' if i % 2 == 0 else '' for i in range(len(x))], axis=1)
+    }).set_table_styles([{
+        'selector': 'thead th',
+        'props': [('background-color', '#4CAF50'), ('color', 'white'), ('font-weight', 'bold')]
+    }])
 
-# Streamlit app
-st.set_page_config(page_title="K-C Tracker", layout="wide")
-st.title("📊 K-C Tracker")
+# Navigation state
+if "page" not in st.session_state:
+    st.session_state.page = "home"
 
-page = st.selectbox("Navigate", ["Submit Request", "Open Topics", "Closed Topics"])
-df = load_data()
+# Navigation buttons
+def nav_buttons():
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("🏠 Home"):
+            st.session_state.page = "home"
+            st.experimental_rerun()
+    with col2:
+        if st.button("🔙 Back"):
+            st.session_state.page = "home"
+            st.experimental_rerun()
 
-if page == "Submit Request":
+# Home Page
+def home():
+    st.title("📘 K-C Issue Tracker")
+    st.markdown("Welcome! Please choose an option below:")
+    st.button("📝 Submit Request", on_click=lambda: set_page("submit"))
+    st.button("📌 Open Topics", on_click=lambda: set_page("open"))
+    st.button("✅ Closed Topics", on_click=lambda: set_page("closed"))
+
+# Set page
+def set_page(page_name):
+    st.session_state.page = page_name
+    st.experimental_rerun()
+
+# Submit Request Page
+def submit_request():
     st.header("📝 Submit Your Request")
+    nav_buttons()
     with st.form("entry_form"):
         topic = st.text_input("Topic")
         owner = st.text_input("Owner")
@@ -72,34 +97,39 @@ if page == "Submit Request":
             new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success("✅ Entry submitted successfully!")
 
-elif page == "Open Topics":
+# Open Topics Page
+def open_topics():
     st.header("📌 Open Topics")
+    nav_buttons()
+    df = load_data()
     open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
     if not open_df.empty:
-        st.dataframe(style_table(open_df[["Topic", "Owner", "Status", "Target Resolution Date"]]), use_container_width=True)
-
-        st.subheader("🔒 Close a Topic")
-        selected_topic = st.selectbox("Select a topic to close", open_df["Topic"].tolist())
-
-        with st.form("close_form"):
-            closing_comment = st.text_area("Closing Comment")
-            closed_by = st.text_input("Closed By")
-            close_submit = st.form_submit_button("Mark as Closed")
-
-            if close_submit:
-                df.loc[df["Topic"] == selected_topic, "Status"] = "Closed"
-                df.loc[df["Topic"] == selected_topic, "Closing Comment"] = closing_comment
-                df.loc[df["Topic"] == selected_topic, "Closed By"] = closed_by
-                df.loc[df["Topic"] == selected_topic, "Actual Resolution Date"] = date.today().isoformat()
-                save_data(df)
-                st.success(f"✅ '{selected_topic}' marked as Closed.")
-                st.experimental_rerun()
+        for i, row in open_df.iterrows():
+            with st.expander(f"🔹 {row['Topic']}"):
+                st.write(f"**Owner:** {row['Owner']}")
+                st.write(f"**Status:** {row['Status']}")
+                st.write(f"**Target Resolution Date:** {row['Target Resolution Date']}")
+                with st.form(f"close_form_{i}"):
+                    closing_comment = st.text_area("Closing Comment", key=f"comment_{i}")
+                    closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
+                    close_submit = st.form_submit_button("Mark as Closed")
+                    if close_submit:
+                        df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
+                        df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = closing_comment
+                        df.loc[df["Topic"] == row["Topic"], "Closed By"] = closed_by
+                        df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
+                        save_data(df)
+                        st.success(f"✅ '{row['Topic']}' marked as Closed.")
+                        st.experimental_rerun()
     else:
         st.info("No open topics available.")
 
-elif page == "Closed Topics":
+# Closed Topics Page
+def closed_topics():
     st.header("✅ Closed Topics")
+    nav_buttons()
+    df = load_data()
     closed_df = df[df["Status"].str.lower() == "closed"]
     if not closed_df.empty:
         st.dataframe(style_table(closed_df[[
@@ -108,3 +138,14 @@ elif page == "Closed Topics":
         ]]), use_container_width=True)
     else:
         st.info("No closed topics available.")
+
+# Page routing
+st.set_page_config(page_title="K-C Tracker", layout="wide")
+if st.session_state.page == "home":
+    home()
+elif st.session_state.page == "submit":
+    submit_request()
+elif st.session_state.page == "open":
+    open_topics()
+elif st.session_state.page == "closed":
+    closed_topics()
