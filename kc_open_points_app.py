@@ -10,6 +10,25 @@ REQUIRED_COLUMNS = [
     "Closing Comment", "Closed By", "Actual Resolution Date"
 ]
 
+# Set blue background using CSS
+page_bg_css = """
+<style>
+    .stApp {
+        background-color: #cce6ff;
+        color: #000000;
+    }
+    /* Style for bordered boxes for each row */
+    .bordered-box {
+        border: 2px solid #007acc;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        background-color: #e6f2ff;
+    }
+</style>
+"""
+st.markdown(page_bg_css, unsafe_allow_html=True)
+
 @st.cache_data
 def load_data():
     if os.path.exists(CSV_FILE):
@@ -22,65 +41,13 @@ def load_data():
         if col not in df.columns:
             df[col] = ""
     
-    df["row_id"] = range(len(df))  # In-memory unique ID
+    df["row_id"] = range(len(df))  # Create in-memory unique ID
     return df
 
 def save_data(df):
     df.drop(columns=["row_id"], inplace=True, errors='ignore')  # Remove before saving
     df.to_csv(CSV_FILE, index=False)
     st.cache_data.clear()
-
-# Inject CSS once
-def inject_css():
-    st.markdown(
-        """
-        <style>
-        /* Page background */
-        .main {
-            background-color: #cce4f7;
-            padding: 10px 20px 30px 20px;
-        }
-        /* Table style */
-        table {
-            border-collapse: collapse;
-            width: 100%;
-        }
-        thead th {
-            position: sticky;
-            top: 0;
-            background-color: #005b96;
-            color: white;
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-            z-index: 100;
-        }
-        tbody td {
-            border: 1px solid #ddd;
-            padding: 8px;
-        }
-        tbody tr:nth-child(even) {
-            background-color: #e6f0fa;
-        }
-        tbody tr:hover {
-            background-color: #d0e2f5;
-        }
-        button {
-            cursor: pointer;
-            padding: 4px 8px;
-            background-color: #0073e6;
-            border: none;
-            color: white;
-            border-radius: 3px;
-            font-size: 14px;
-        }
-        button:hover {
-            background-color: #005bb5;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
 
 def submit_request():
     st.header("📝 Submit Request")
@@ -107,7 +74,6 @@ def submit_request():
 
 def open_topics():
     st.header("📌 Open Topics")
-    inject_css()
     df = load_data()
     df_open = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
@@ -120,54 +86,45 @@ def open_topics():
     if "close_row" not in st.session_state:
         st.session_state.close_row = None
 
-    # Build the table header and body HTML manually for better styling and fixed header
-    table_html = """
-    <table>
-    <thead>
-    <tr>
-        <th style="width:5%;">S.No.</th>
-        <th style="width:25%;">Topic</th>
-        <th style="width:15%;">Owner</th>
-        <th style="width:10%;">Status</th>
-        <th style="width:15%;">Target Resolution Date</th>
-        <th style="width:10%;">Close</th>
-        <th style="width:10%;">Edit</th>
-    </tr>
-    </thead>
-    <tbody>
-    """
+    # Header row with borders using markdown inside columns
+    header_cols = st.columns([1, 3, 2, 2, 3, 1, 1])
+    header_cols[0].markdown("**S.No**")
+    header_cols[1].markdown("**Topic**")
+    header_cols[2].markdown("**Owner**")
+    header_cols[3].markdown("**Status**")
+    header_cols[4].markdown("**Target Date**")
+    header_cols[5].markdown("**Close**")
+    header_cols[6].markdown("**Edit**")
 
     for idx, row in df_open.iterrows():
         row_id = row["row_id"]
-        table_html += f"""
-        <tr>
-            <td>{idx + 1}</td>
-            <td>{row['Topic']}</td>
-            <td>{row['Owner']}</td>
-            <td>{row['Status']}</td>
-            <td>{row['Target Resolution Date']}</td>
-            <td><form><button id="close_{row_id}">Close</button></form></td>
-            <td><form><button id="edit_{row_id}">Edit</button></form></td>
-        </tr>
-        """
-    table_html += "</tbody></table>"
+        # Put each row inside a container with bordered box style
+        with st.container():
+            st.markdown(f'<div class="bordered-box">', unsafe_allow_html=True)
+            cols = st.columns([1, 3, 2, 2, 3, 1, 1])
+            cols[0].write(idx + 1)  # Serial number starting from 1
+            cols[1].write(row["Topic"])
+            cols[2].write(row["Owner"])
+            cols[3].write(row["Status"])
+            cols[4].write(str(row["Target Resolution Date"]))
 
-    # Display the table
-    st.markdown(table_html, unsafe_allow_html=True)
+            if cols[5].button("Close", key=f"close_{row_id}"):
+                st.session_state.close_row = row_id
+                st.session_state.edit_row = None
 
-    # Now display Close and Edit forms below table if any row selected
-    for idx, row in df_open.iterrows():
-        row_id = row["row_id"]
+            if cols[6].button("Edit", key=f"edit_{row_id}"):
+                st.session_state.edit_row = row_id
+                st.session_state.close_row = None
 
-        # Close dialog form
+            st.markdown("</div>", unsafe_allow_html=True)
+
         if st.session_state.close_row == row_id:
             with st.form(f"close_form_{row_id}"):
-                st.write(f"🔒 Close topic: **{row['Topic']}**")
                 comment = st.text_area("Closing Comment", key=f"cmt_{row_id}")
                 closed_by = st.text_input("Closed By", key=f"cby_{row_id}")
                 action = st.radio("Action", ["Confirm Close", "Cancel"], key=f"close_act_{row_id}")
-                submitted = st.form_submit_button("Submit")
-                if submitted:
+                submit = st.form_submit_button("Submit")
+                if submit:
                     if action == "Confirm Close":
                         df.loc[df["row_id"] == row_id, "Status"] = "Closed"
                         df.loc[df["row_id"] == row_id, "Closing Comment"] = comment
@@ -178,16 +135,18 @@ def open_topics():
                     st.session_state.close_row = None
                     st.experimental_rerun()
 
-        # Edit dialog form
         if st.session_state.edit_row == row_id:
             with st.form(f"edit_form_{row_id}"):
                 new_topic = st.text_input("Topic", value=row["Topic"], key=f"et_{row_id}")
                 new_owner = st.text_input("Owner", value=row["Owner"], key=f"eo_{row_id}")
                 new_status = st.text_input("Status", value=row["Status"], key=f"es_{row_id}")
-                new_date = st.date_input("Target Resolution Date", pd.to_datetime(row["Target Resolution Date"]), key=f"ed_{row_id}")
+                try:
+                    new_date = st.date_input("Target Resolution Date", pd.to_datetime(row["Target Resolution Date"]), key=f"ed_{row_id}")
+                except:
+                    new_date = st.date_input("Target Resolution Date", key=f"ed_{row_id}")
                 action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_act_{row_id}")
-                submitted = st.form_submit_button("Submit")
-                if submitted:
+                submit = st.form_submit_button("Submit")
+                if submit:
                     if action == "Save Changes":
                         df.loc[df["row_id"] == row_id, "Topic"] = new_topic
                         df.loc[df["row_id"] == row_id, "Owner"] = new_owner
@@ -203,28 +162,24 @@ def open_topics():
 
 def closed_topics():
     st.header("✅ Closed Topics")
-    inject_css()
     df = load_data()
     df_closed = df[df["Status"].str.lower() == "closed"]
-
-    if df_closed.empty:
-        st.info("No closed topics available.")
-        return
-
-    # Use pandas styling for closed topics to keep simple
     st.dataframe(df_closed.drop(columns=["row_id"]), use_container_width=True)
 
     csv = df_closed.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Closed Topics", data=csv, file_name="closed_topics.csv", mime="text/csv")
 
+def home():
+    st.title("📘 K-C Issue Tracker")
+    st.write("Use the left sidebar to navigate between pages.")
+
 def main():
-    st.set_page_config(page_title="K-C Tracker", layout="wide")
+    st.set_page_config("K-C Tracker", layout="wide")
     st.sidebar.title("📘 KC Tracker Navigation")
     page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics"])
 
     if page == "Home":
-        st.title("📘 KC Issue Tracker")
-        st.markdown("Use the left sidebar to navigate between pages.")
+        home()
     elif page == "Submit Request":
         submit_request()
     elif page == "Open Topics":
