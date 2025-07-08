@@ -81,6 +81,10 @@ def open_topics():
     clicked_close = None
     clicked_edit = None
 
+    # Flag to trigger rerun once after handling submissions
+    if "needs_rerun" not in st.session_state:
+        st.session_state.needs_rerun = False
+
     for i, row in open_df.iterrows():
         with st.container():
             style = "background-color: #e6f2ff; border: 1px solid #cce6ff; padding: 10px; margin-bottom: 5px;"
@@ -117,11 +121,11 @@ def open_topics():
                             save_data(df)
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
                             st.session_state.close_row = None
-                            st.experimental_rerun()
+                            st.session_state.needs_rerun = True
                         else:
                             st.info("Close operation cancelled.")
                             st.session_state.close_row = None
-                            st.experimental_rerun()
+                            st.session_state.needs_rerun = True
 
             # Edit dialog
             if "edit_row" in st.session_state and st.session_state.edit_row == i:
@@ -149,11 +153,11 @@ def open_topics():
                             save_data(df)
                             st.success(f"✅ '{new_topic}' updated successfully.")
                             st.session_state.edit_row = None
-                            st.experimental_rerun()
+                            st.session_state.needs_rerun = True
                         else:
                             st.info("Edit operation cancelled.")
                             st.session_state.edit_row = None
-                            st.experimental_rerun()
+                            st.session_state.needs_rerun = True
 
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -164,6 +168,11 @@ def open_topics():
     if clicked_edit is not None:
         st.session_state.edit_row = clicked_edit
         st.session_state.close_row = None
+
+    # If flagged, do rerun once here safely
+    if st.session_state.needs_rerun:
+        st.session_state.needs_rerun = False
+        st.experimental_rerun()
 
     csv = open_df.to_csv(index=False).encode('utf-8')
     st.download_button(
