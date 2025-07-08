@@ -48,7 +48,7 @@ def nav_buttons():
             st.rerun()
 
 def home():
-    st.title("📘 K-C Issue Tracker")
+    st.markdown("## 📘 K-C Issue Tracker\n", unsafe_allow_html=True)
     st.markdown("Welcome! Please choose an option below:")
     if st.button("📝 Submit Request"):
         st.session_state.page = "submit"
@@ -59,9 +59,8 @@ def home():
     if st.button("✅ Closed Topics"):
         st.session_state.page = "closed"
         st.rerun()
-
 def submit_request():
-    st.markdown("### 📝 Submit Your Request")
+    st.markdown("### 📝 Submit Your Request\n", unsafe_allow_html=True)
     nav_buttons()
     with st.form("entry_form"):
         topic = st.text_input("Topic")
@@ -81,8 +80,9 @@ def submit_request():
             }])
             new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success("✅ Entry submitted successfully!")
+
 def open_topics():
-    st.markdown("### 📌 Open Topics")
+    st.markdown("### 📌 Open Topics\n", unsafe_allow_html=True)
     nav_buttons()
     df = load_data()
     open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
@@ -118,30 +118,13 @@ def open_topics():
                         st.success("✅ Changes saved.")
                         st.rerun()
 
-        csv = open_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="⬇️ Download Open Topics as CSV",
-            data=csv,
-            file_name="open_topics.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("No open topics available.")
-
 def closed_topics():
-    st.markdown("### ✅ Closed Topics")
+    st.markdown("### ✅ Closed Topics\n", unsafe_allow_html=True)
     nav_buttons()
     df = load_data()
     closed_df = df[df["Status"].str.lower() == "closed"]
     if not closed_df.empty:
         st.dataframe(closed_df, use_container_width=True)
-        csv = closed_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="⬇️ Download Closed Topics as CSV",
-            data=csv,
-            file_name="closed_topics.csv",
-            mime="text/csv"
-        )
     else:
         st.info("No closed topics available.")
 
