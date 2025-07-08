@@ -30,40 +30,35 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# Initialize session state variables
+# Initialize session state variables safely
 if "page" not in st.session_state:
     st.session_state.page = "home"
-
 if "history" not in st.session_state:
     st.session_state.history = []
-
 if "close_row" not in st.session_state:
     st.session_state.close_row = None
-
 if "edit_row" not in st.session_state:
     st.session_state.edit_row = None
+if "need_rerun" not in st.session_state:
+    st.session_state.need_rerun = False
 
 def navigate_to(page):
-    # Add current page to history before navigating, unless it's home or same page
     if st.session_state.page != page:
         if st.session_state.page != "home":
             st.session_state.history.append(st.session_state.page)
-        # Clear edit/close state when navigating away
         st.session_state.edit_row = None
         st.session_state.close_row = None
         st.session_state.page = page
-        st.experimental_rerun()
+        st.session_state.need_rerun = True  # Mark rerun requested
 
 def go_back():
     if st.session_state.history:
         previous = st.session_state.history.pop()
-        # Clear edit/close on back navigation
         st.session_state.edit_row = None
         st.session_state.close_row = None
         st.session_state.page = previous
-        st.experimental_rerun()
+        st.session_state.need_rerun = True
     else:
-        # No history, go home
         go_home()
 
 def go_home():
@@ -71,7 +66,7 @@ def go_home():
     st.session_state.history = []
     st.session_state.edit_row = None
     st.session_state.close_row = None
-    st.experimental_rerun()
+    st.session_state.need_rerun = True
 
 def nav_buttons():
     col1, col2 = st.columns([1,1])
@@ -114,17 +109,15 @@ def submit_request():
             new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success("✅ Entry submitted successfully!")
 
-def safe_to_date(date_val):
-    if isinstance(date_val, (datetime, pd.Timestamp)):
-        return date_val.date()
-    if isinstance(date_val, date):
-        return date_val
+def safe_to_date(val):
+    # Convert various formats to datetime.date safely
+    if pd.isna(val) or val == "":
+        return date.today()
+    if isinstance(val, date):
+        return val
     try:
-        dt = pd.to_datetime(date_val, errors='coerce')
-        if pd.isna(dt):
-            return date.today()
-        else:
-            return dt.date()
+        dt = pd.to_datetime(val)
+        return dt.date()
     except Exception:
         return date.today()
 
@@ -149,12 +142,13 @@ def open_topics():
     header[4].markdown("**Close**")
     header[5].markdown("**Edit**")
 
-    button_clicked = None
+    clicked_close = None
+    clicked_edit = None
 
     for i, row in open_df.iterrows():
         with st.container():
-            row_style = "background-color: #e6f2ff; border: 1px solid #cce6ff; padding: 10px; margin-bottom: 5px;"
-            st.markdown(f"<div style='{row_style}'>", unsafe_allow_html=True)
+            style = "background-color: #e6f2ff; border: 1px solid #cce6ff; padding: 10px; margin-bottom: 5px;"
+            st.markdown(f"<div style='{style}'>", unsafe_allow_html=True)
 
             cols = st.columns([3, 2, 2, 3, 1, 1])
             cols[0].markdown(row["Topic"])
@@ -163,10 +157,11 @@ def open_topics():
             cols[3].markdown(row["Target Resolution Date"])
 
             if cols[4].button("Close", key=f"close_btn_{i}"):
-                button_clicked = ("close", i)
+                clicked_close = i
             if cols[5].button("Edit", key=f"edit_btn_{i}"):
-                button_clicked = ("edit", i)
+                clicked_edit = i
 
+            # Close form
             if st.session_state.close_row == i:
                 with st.form(f"close_form_{i}"):
                     st.markdown("**🔒 Provide Closing Details**")
@@ -182,10 +177,10 @@ def open_topics():
                             df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                             save_data(df)
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
-                        # Close or Cancel: clear close_row and refresh
                         st.session_state.close_row = None
-                        st.experimental_rerun()
+                        st.session_state.need_rerun = True
 
+            # Edit form
             if st.session_state.edit_row == i:
                 with st.form(f"edit_form_{i}"):
                     st.markdown("**✏️ Edit Topic Details**")
@@ -199,7 +194,6 @@ def open_topics():
                     )
                     action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
                     submitted = st.form_submit_button("Submit")
-
                     if submitted:
                         if action == "Save Changes":
                             df.loc[df["Topic"] == row["Topic"], "Topic"] = new_topic
@@ -208,21 +202,21 @@ def open_topics():
                             df.loc[df["Topic"] == new_topic, "Target Resolution Date"] = new_date
                             save_data(df)
                             st.success(f"✅ '{new_topic}' updated successfully.")
-                        # Save or Cancel: clear edit_row and refresh
                         st.session_state.edit_row = None
-                        st.experimental_rerun()
+                        st.session_state.need_rerun = True
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-    if button_clicked:
-        action, idx = button_clicked
-        if action == "close":
-            st.session_state.close_row = idx
-            st.session_state.edit_row = None
-        elif action == "edit":
-            st.session_state.edit_row = idx
-            st.session_state.close_row = None
-        st.experimental_rerun()
+    # Handle clicks AFTER rendering all rows to avoid state conflicts
+    if clicked_close is not None:
+        st.session_state.close_row = clicked_close
+        st.session_state.edit_row = None
+        st.session_state.need_rerun = True
+
+    if clicked_edit is not None:
+        st.session_state.edit_row = clicked_edit
+        st.session_state.close_row = None
+        st.session_state.need_rerun = True
 
     csv = open_df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -253,7 +247,8 @@ def closed_topics():
     else:
         st.info("No closed topics available.")
 
-# Page routing
+# Page routing and rerun control
+
 st.set_page_config(page_title="K-C Tracker", layout="wide")
 
 if st.session_state.page == "home":
@@ -264,3 +259,8 @@ elif st.session_state.page == "open":
     open_topics()
 elif st.session_state.page == "closed":
     closed_topics()
+
+# Single rerun call if needed, after all UI logic done
+if st.session_state.need_rerun:
+    st.session_state.need_rerun = False
+    st.experimental_rerun()
