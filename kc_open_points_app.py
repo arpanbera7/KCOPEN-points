@@ -75,7 +75,7 @@ def submit_request():
 def open_topics():
     st.header("📌 Open Topics")
     df = load_data()
-    df_open = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)  # reset index here
+    df_open = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
     if df_open.empty:
         st.info("No open topics available.")
@@ -86,7 +86,6 @@ def open_topics():
     if "close_row" not in st.session_state:
         st.session_state.close_row = None
 
-    # Header row with borders using markdown inside columns
     header_cols = st.columns([1, 3, 2, 2, 3, 1, 1])
     header_cols[0].markdown("**S.No**")
     header_cols[1].markdown("**Topic**")
@@ -101,7 +100,7 @@ def open_topics():
         with st.container():
             st.markdown(f'<div class="bordered-box">', unsafe_allow_html=True)
             cols = st.columns([1, 3, 2, 2, 3, 1, 1])
-            cols[0].write(idx + 1)  # Serial number starting from 1
+            cols[0].write(idx + 1)
             cols[1].write(row["Topic"])
             cols[2].write(row["Owner"])
             cols[3].write(row["Status"])
@@ -162,33 +161,52 @@ def open_topics():
 def closed_topics():
     st.header("✅ Closed Topics")
     df = load_data()
-    df_closed = df[df["Status"].str.lower() == "closed"].reset_index(drop=True)  # reset index here
+    df_closed = df[df["Status"].str.lower() == "closed"].reset_index(drop=True)
 
     if df_closed.empty:
         st.info("No closed topics available.")
         return
 
-    # Show table with serial number and columns
-    st.markdown("### Closed Topics List")
-    header_cols = st.columns([1, 3, 2, 3, 2, 3])
+    if "delete_row" not in st.session_state:
+        st.session_state.delete_row = None
+
+    header_cols = st.columns([1, 3, 2, 3, 2, 3, 1])
     header_cols[0].markdown("**S.No**")
     header_cols[1].markdown("**Topic**")
     header_cols[2].markdown("**Owner**")
     header_cols[3].markdown("**Actual Resolution Date**")
     header_cols[4].markdown("**Closed By**")
     header_cols[5].markdown("**Closing Comment**")
+    header_cols[6].markdown("**Delete**")
 
     for idx, row in df_closed.iterrows():
-        cols = st.columns([1, 3, 2, 3, 2, 3])
-        cols[0].write(idx + 1)  # serial number starting at 1
+        row_id = row["row_id"]
+        cols = st.columns([1, 3, 2, 3, 2, 3, 1])
+        cols[0].write(idx + 1)
         cols[1].write(row["Topic"])
         cols[2].write(row["Owner"])
         cols[3].write(str(row["Actual Resolution Date"]))
         cols[4].write(row["Closed By"])
         cols[5].write(row["Closing Comment"])
 
-    csv = df_closed.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
-    st.download_button("⬇️ Download Closed Topics", data=csv, file_name="closed_topics.csv", mime="text/csv")
+        if cols[6].button("Delete", key=f"del_{row_id}"):
+            st.session_state.delete_row = row_id
+
+    if st.session_state.delete_row is not None:
+        st.warning("⚠️ Are you sure you want to delete this record?")
+        confirm, cancel = st.columns(2)
+        with confirm:
+            if st.button("Yes, Delete"):
+                df = load_data()
+                df = df[df["row_id"] != st.session_state.delete_row]
+                save_data(df)
+                st.success("✅ Record deleted successfully.")
+                st.session_state.delete_row = None
+                st.experimental_rerun()
+        with cancel:
+            if st.button("Cancel"):
+                st.session_state.delete_row = None
+                st.experimental_rerun()
 
 def home():
     st.title("📘 K-C Issue Tracker")
