@@ -29,6 +29,7 @@ def load_data():
 
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
+    st.cache_data.clear()  # Ensure fresh reload
 
 def safe_to_date(val):
     try:
@@ -105,7 +106,7 @@ def open_topics():
                             df.at[i, "Closed By"] = closed_by
                             df.at[i, "Actual Resolution Date"] = date.today()
                             save_data(df)
-                            st.success("Closed successfully.")
+                            st.success("✅ Topic closed successfully.")
                         st.session_state.close_row = None
 
             # Edit form
@@ -125,7 +126,7 @@ def open_topics():
                             df.at[i, "Status"] = new_status
                             df.at[i, "Target Resolution Date"] = new_date
                             save_data(df)
-                            st.success("Changes saved.")
+                            st.success("✅ Changes saved.")
                         st.session_state.edit_row = None
 
     csv = open_df.to_csv(index=False).encode("utf-8")
@@ -142,14 +143,14 @@ def closed_topics():
     csv = closed_df.to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Closed Topics", data=csv, file_name="closed_topics.csv", mime="text/csv")
 
-# Set up navigation
+# Page config and navigation
 st.set_page_config("K-C Tracker", layout="wide")
 st.sidebar.title("📘 KC Tracker Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics"])
 
 if page == "Home":
     st.title("📘 KC Open Points Tracker")
-    st.markdown("Welcome to the Issue Tracking System.")
+    st.markdown("Welcome to the Issue Tracking System. Please choose an option from the left sidebar.")
 elif page == "Submit Request":
     submit_request()
 elif page == "Open Topics":
