@@ -69,7 +69,7 @@ def login():
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.role = ""
-        st.session_state.login_attempted = False  # To control rerun
+        st.session_state.login_attempted = False
 
     users_df = load_users()
 
@@ -89,12 +89,12 @@ def login():
 
             st.session_state.login_attempted = True
 
+        # Call rerun only once, outside of the button callback
         if st.session_state.login_attempted:
             st.session_state.login_attempted = False
             st.experimental_rerun()
 
-        st.stop()  # Stop here until logged in
-
+        st.stop()
     else:
         st.sidebar.info(f"👤 {st.session_state.username} ({st.session_state.role})")
         if st.sidebar.button("Logout"):
