@@ -19,9 +19,9 @@ page_bg_css = """
     }
     /* Style for bordered boxes for each row */
     .bordered-box {
-        border: 2px solid #007acc;
+        border: 1px solid #007acc;
         padding: 10px;
-        border-radius: 8px;
+        border-radius: 6px;
         margin-bottom: 10px;
         background-color: #e6f2ff;
     }
@@ -75,7 +75,7 @@ def submit_request():
 def open_topics():
     st.header("📌 Open Topics")
     df = load_data()
-    df_open = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
+    df_open = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)  # reset index here
 
     if df_open.empty:
         st.info("No open topics available.")
@@ -98,7 +98,6 @@ def open_topics():
 
     for idx, row in df_open.iterrows():
         row_id = row["row_id"]
-        # Put each row inside a container with bordered box style
         with st.container():
             st.markdown(f'<div class="bordered-box">', unsafe_allow_html=True)
             cols = st.columns([1, 3, 2, 2, 3, 1, 1])
@@ -163,8 +162,30 @@ def open_topics():
 def closed_topics():
     st.header("✅ Closed Topics")
     df = load_data()
-    df_closed = df[df["Status"].str.lower() == "closed"]
-    st.dataframe(df_closed.drop(columns=["row_id"]), use_container_width=True)
+    df_closed = df[df["Status"].str.lower() == "closed"].reset_index(drop=True)  # reset index here
+
+    if df_closed.empty:
+        st.info("No closed topics available.")
+        return
+
+    # Show table with serial number and columns
+    st.markdown("### Closed Topics List")
+    header_cols = st.columns([1, 3, 2, 3, 2, 3])
+    header_cols[0].markdown("**S.No**")
+    header_cols[1].markdown("**Topic**")
+    header_cols[2].markdown("**Owner**")
+    header_cols[3].markdown("**Actual Resolution Date**")
+    header_cols[4].markdown("**Closed By**")
+    header_cols[5].markdown("**Closing Comment**")
+
+    for idx, row in df_closed.iterrows():
+        cols = st.columns([1, 3, 2, 3, 2, 3])
+        cols[0].write(idx + 1)  # serial number starting at 1
+        cols[1].write(row["Topic"])
+        cols[2].write(row["Owner"])
+        cols[3].write(str(row["Actual Resolution Date"]))
+        cols[4].write(row["Closed By"])
+        cols[5].write(row["Closing Comment"])
 
     csv = df_closed.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Closed Topics", data=csv, file_name="closed_topics.csv", mime="text/csv")
