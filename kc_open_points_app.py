@@ -10,6 +10,25 @@ REQUIRED_COLUMNS = [
     "Closing Comment", "Closed By", "Actual Resolution Date"
 ]
 
+# Set blue background using CSS
+page_bg_css = """
+<style>
+    .stApp {
+        background-color: #cce6ff;
+        color: #000000;
+    }
+    /* Style for bordered boxes for each row */
+    .bordered-box {
+        border: 2px solid #007acc;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        background-color: #e6f2ff;
+    }
+</style>
+"""
+st.markdown(page_bg_css, unsafe_allow_html=True)
+
 @st.cache_data
 def load_data():
     if os.path.exists(CSV_FILE):
@@ -58,27 +77,46 @@ def open_topics():
     df = load_data()
     df_open = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
+    if df_open.empty:
+        st.info("No open topics available.")
+        return
+
     if "edit_row" not in st.session_state:
         st.session_state.edit_row = None
     if "close_row" not in st.session_state:
         st.session_state.close_row = None
 
-    for _, row in df_open.iterrows():
+    # Header row with borders using markdown inside columns
+    header_cols = st.columns([1, 3, 2, 2, 3, 1, 1])
+    header_cols[0].markdown("**S.No**")
+    header_cols[1].markdown("**Topic**")
+    header_cols[2].markdown("**Owner**")
+    header_cols[3].markdown("**Status**")
+    header_cols[4].markdown("**Target Date**")
+    header_cols[5].markdown("**Close**")
+    header_cols[6].markdown("**Edit**")
+
+    for idx, row in df_open.iterrows():
         row_id = row["row_id"]
-        st.markdown("---")
-        cols = st.columns([3, 2, 2, 3, 1, 1])
-        cols[0].markdown(f"**{row['Topic']}**")
-        cols[1].markdown(row["Owner"])
-        cols[2].markdown(row["Status"])
-        cols[3].markdown(str(row["Target Resolution Date"]))
+        # Put each row inside a container with bordered box style
+        with st.container():
+            st.markdown(f'<div class="bordered-box">', unsafe_allow_html=True)
+            cols = st.columns([1, 3, 2, 2, 3, 1, 1])
+            cols[0].write(idx + 1)  # Serial number starting from 1
+            cols[1].write(row["Topic"])
+            cols[2].write(row["Owner"])
+            cols[3].write(row["Status"])
+            cols[4].write(str(row["Target Resolution Date"]))
 
-        if cols[4].button("Close", key=f"close_{row_id}"):
-            st.session_state.close_row = row_id
-            st.session_state.edit_row = None
+            if cols[5].button("Close", key=f"close_{row_id}"):
+                st.session_state.close_row = row_id
+                st.session_state.edit_row = None
 
-        if cols[5].button("Edit", key=f"edit_{row_id}"):
-            st.session_state.edit_row = row_id
-            st.session_state.close_row = None
+            if cols[6].button("Edit", key=f"edit_{row_id}"):
+                st.session_state.edit_row = row_id
+                st.session_state.close_row = None
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
         if st.session_state.close_row == row_id:
             with st.form(f"close_form_{row_id}"):
@@ -95,13 +133,17 @@ def open_topics():
                         save_data(df)
                         st.success("✅ Topic closed.")
                     st.session_state.close_row = None
+                    st.experimental_rerun()
 
         if st.session_state.edit_row == row_id:
             with st.form(f"edit_form_{row_id}"):
                 new_topic = st.text_input("Topic", value=row["Topic"], key=f"et_{row_id}")
                 new_owner = st.text_input("Owner", value=row["Owner"], key=f"eo_{row_id}")
                 new_status = st.text_input("Status", value=row["Status"], key=f"es_{row_id}")
-                new_date = st.date_input("Target Resolution Date", pd.to_datetime(row["Target Resolution Date"]), key=f"ed_{row_id}")
+                try:
+                    new_date = st.date_input("Target Resolution Date", pd.to_datetime(row["Target Resolution Date"]), key=f"ed_{row_id}")
+                except:
+                    new_date = st.date_input("Target Resolution Date", key=f"ed_{row_id}")
                 action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_act_{row_id}")
                 submit = st.form_submit_button("Submit")
                 if submit:
@@ -113,6 +155,7 @@ def open_topics():
                         save_data(df)
                         st.success("✅ Changes saved.")
                     st.session_state.edit_row = None
+                    st.experimental_rerun()
 
     csv = df_open.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Open Topics", data=csv, file_name="open_topics.csv", mime="text/csv")
@@ -126,17 +169,23 @@ def closed_topics():
     csv = df_closed.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Closed Topics", data=csv, file_name="closed_topics.csv", mime="text/csv")
 
-# Set page
-st.set_page_config("K-C Tracker", layout="wide")
-st.sidebar.title("📘 KC Tracker Navigation")
-page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics"])
+def home():
+    st.title("📘 K-C Issue Tracker")
+    st.write("Use the left sidebar to navigate between pages.")
 
-if page == "Home":
-    st.title("📘 KC Issue Tracker")
-    st.markdown("Use the left sidebar to navigate between pages.")
-elif page == "Submit Request":
-    submit_request()
-elif page == "Open Topics":
-    open_topics()
-elif page == "Closed Topics":
-    closed_topics()
+def main():
+    st.set_page_config("K-C Tracker", layout="wide")
+    st.sidebar.title("📘 KC Tracker Navigation")
+    page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics"])
+
+    if page == "Home":
+        home()
+    elif page == "Submit Request":
+        submit_request()
+    elif page == "Open Topics":
+        open_topics()
+    elif page == "Closed Topics":
+        closed_topics()
+
+if __name__ == "__main__":
+    main()
