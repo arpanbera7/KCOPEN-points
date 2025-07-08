@@ -3,7 +3,6 @@ import pandas as pd
 import os
 from datetime import date
 
-# File paths
 EXCEL_FILE = "KC Open Points.xlsx"
 CSV_FILE = "kc_open_points.csv"
 
@@ -93,7 +92,6 @@ def open_topics():
     if not open_df.empty:
         st.markdown("### 🗂️ Topics Table")
 
-        # Table header
         header = st.columns([3, 2, 2, 3, 1, 1])
         header[0].markdown("**Topic**")
         header[1].markdown("**Owner**")
@@ -123,7 +121,6 @@ def open_topics():
                         st.session_state.close_row = None
                         st.rerun()
 
-                # Close form
                 if st.session_state.close_row == i:
                     with st.form(f"close_form_{i}"):
                         st.markdown("**🔒 Provide Closing Details**")
@@ -145,7 +142,6 @@ def open_topics():
                                 st.session_state.close_row = None
                                 st.rerun()
 
-                # Edit form
                 if st.session_state.edit_row == i:
                     with st.form(f"edit_form_{i}"):
                         st.markdown("**✏️ Edit Topic Details**")
@@ -171,7 +167,37 @@ def open_topics():
 
                 st.markdown("</div>", unsafe_allow_html=True)
 
-        # Download Open Topics
         csv = open_df.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label
+            label="⬇️ Download Open Topics as CSV",
+            data=csv,
+            file_name='open_topics.csv',
+            mime='text/csv'
+        )
+    else:
+        st.info("No open topics available.")
+
+def closed_topics():
+    st.markdown("<h2 style='color:#0073e6;'>✅ Closed Topics</h2>", unsafe_allow_html=True)
+    nav_buttons()
+    df = load_data()
+    closed_df = df[df["Status"].str.lower() == "closed"]
+    if not closed_df.empty:
+        st.dataframe(closed_df[[
+            "Topic", "Owner", "Target Resolution Date",
+            "Actual Resolution Date", "Closed By", "Closing Comment"
+        ]], use_container_width=True)
+
+        csv = closed_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="⬇️ Download Closed Topics as CSV",
+            data=csv,
+            file_name='closed_topics.csv',
+            mime='text/csv'
+        )
+    else:
+        st.info("No closed topics available.")
+
+# Page routing
+st.set_page_config(page_title="K-C Tracker", layout="wide")
+if st.session_state
