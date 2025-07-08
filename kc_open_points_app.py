@@ -37,12 +37,12 @@ def save_data(df):
 # Style table
 def style_table(df):
     return df.style.set_properties(**{
-        'background-color': '#f9f9f9',
-        'color': '#333',
-        'border-color': 'gray'
+        'background-color': '#f0f8ff',
+        'color': '#003366',
+        'border-color': '#cce6ff'
     }).set_table_styles([{
         'selector': 'thead th',
-        'props': [('background-color', '#4CAF50'), ('color', 'white'), ('font-weight', 'bold')]
+        'props': [('background-color', '#0073e6'), ('color', 'white'), ('font-weight', 'bold')]
     }])
 
 # Navigation state
@@ -63,20 +63,21 @@ def nav_buttons():
 
 # Home Page
 def home():
-    st.title("📘 K-C Issue Tracker")
+    st.markdown("<h1 style='color:#0073e6;'>📘 K-C Issue Tracker</h1>", unsafe_allow_html=True)
     st.markdown("Welcome! Please choose an option below:")
-    st.button("📝 Submit Request", on_click=lambda: set_page("submit"))
-    st.button("📌 Open Topics", on_click=lambda: set_page("open"))
-    st.button("✅ Closed Topics", on_click=lambda: set_page("closed"))
-
-# Set page
-def set_page(page_name):
-    st.session_state.page = page_name
-    st.experimental_rerun()
+    if st.button("📝 Submit Request"):
+        st.session_state.page = "submit"
+        st.experimental_rerun()
+    if st.button("📌 Open Topics"):
+        st.session_state.page = "open"
+        st.experimental_rerun()
+    if st.button("✅ Closed Topics"):
+        st.session_state.page = "closed"
+        st.experimental_rerun()
 
 # Submit Request Page
 def submit_request():
-    st.header("📝 Submit Your Request")
+    st.markdown("<h2 style='color:#0073e6;'>📝 Submit Your Request</h2>", unsafe_allow_html=True)
     nav_buttons()
     with st.form("entry_form"):
         topic = st.text_input("Topic")
@@ -99,7 +100,7 @@ def submit_request():
 
 # Open Topics Page
 def open_topics():
-    st.header("📌 Open Topics")
+    st.markdown("<h2 style='color:#0073e6;'>📌 Open Topics</h2>", unsafe_allow_html=True)
     nav_buttons()
     df = load_data()
     open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
@@ -127,7 +128,7 @@ def open_topics():
 
 # Closed Topics Page
 def closed_topics():
-    st.header("✅ Closed Topics")
+    st.markdown("<h2 style='color:#0073e6;'>✅ Closed Topics</h2>", unsafe_allow_html=True)
     nav_buttons()
     df = load_data()
     closed_df = df[df["Status"].str.lower() == "closed"]
