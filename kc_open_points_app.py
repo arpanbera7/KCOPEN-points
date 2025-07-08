@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-import os
 from datetime import date
+import os
 
-EXCEL_FILE = "KC Open Points.xlsx"
 CSV_FILE = "kc_open_points.csv"
 
 REQUIRED_COLUMNS = [
@@ -16,30 +15,24 @@ def load_data():
     if os.path.exists(CSV_FILE):
         df = pd.read_csv(CSV_FILE)
     else:
-        df = pd.read_excel(EXCEL_FILE, engine="openpyxl")
-        df.rename(columns={"Resolution Date": "Target Resolution Date"}, inplace=True)
-        df["Closing Comment"] = ""
-        df["Closed By"] = ""
-        df["Actual Resolution Date"] = ""
-        df.to_csv(CSV_FILE, index=False)
+        st.error("CSV file not found.")
+        return pd.DataFrame(columns=REQUIRED_COLUMNS)
+    
     for col in REQUIRED_COLUMNS:
         if col not in df.columns:
             df[col] = ""
-    return df[REQUIRED_COLUMNS]
+    
+    df["row_id"] = range(len(df))  # Create in-memory unique ID
+    return df
 
 def save_data(df):
+    df.drop(columns=["row_id"], inplace=True, errors='ignore')  # Remove before saving
     df.to_csv(CSV_FILE, index=False)
     st.cache_data.clear()
 
-def safe_to_date(val):
-    try:
-        return pd.to_datetime(val).date()
-    except:
-        return date.today()
-
 def submit_request():
-    st.header("📝 Submit Your Request")
-    with st.form("entry_form"):
+    st.header("📝 Submit Request")
+    with st.form("form_submit"):
         topic = st.text_input("Topic")
         owner = st.text_input("Owner")
         status = st.text_input("Status")
@@ -47,7 +40,7 @@ def submit_request():
         submitted = st.form_submit_button("Submit")
         if submitted:
             df = load_data()
-            new_entry = pd.DataFrame([{
+            new_row = {
                 "Topic": topic,
                 "Owner": owner,
                 "Status": status,
@@ -55,104 +48,92 @@ def submit_request():
                 "Closing Comment": "",
                 "Closed By": "",
                 "Actual Resolution Date": ""
-            }])
-            df = pd.concat([df, new_entry], ignore_index=True)
+            }
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             save_data(df)
-            st.success("✅ Request submitted successfully.")
+            st.success("✅ Request submitted successfully!")
 
 def open_topics():
     st.header("📌 Open Topics")
     df = load_data()
-    open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
-
-    if open_df.empty:
-        st.info("No open topics available.")
-        return
+    df_open = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
     if "edit_row" not in st.session_state:
         st.session_state.edit_row = None
     if "close_row" not in st.session_state:
         st.session_state.close_row = None
 
-    for i, row in open_df.iterrows():
-        with st.container():
-            st.markdown("---")
-            cols = st.columns([3, 2, 2, 3, 1, 1])
-            cols[0].markdown(f"**{row['Topic']}**")
-            cols[1].markdown(row["Owner"])
-            cols[2].markdown(row["Status"])
-            cols[3].markdown(str(row["Target Resolution Date"]))
+    for _, row in df_open.iterrows():
+        row_id = row["row_id"]
+        st.markdown("---")
+        cols = st.columns([3, 2, 2, 3, 1, 1])
+        cols[0].markdown(f"**{row['Topic']}**")
+        cols[1].markdown(row["Owner"])
+        cols[2].markdown(row["Status"])
+        cols[3].markdown(str(row["Target Resolution Date"]))
 
-            if cols[4].button("Close", key=f"close_{i}"):
-                st.session_state.close_row = i
-                st.session_state.edit_row = None
+        if cols[4].button("Close", key=f"close_{row_id}"):
+            st.session_state.close_row = row_id
+            st.session_state.edit_row = None
 
-            if cols[5].button("Edit", key=f"edit_{i}"):
-                st.session_state.edit_row = i
-                st.session_state.close_row = None
+        if cols[5].button("Edit", key=f"edit_{row_id}"):
+            st.session_state.edit_row = row_id
+            st.session_state.close_row = None
 
-            # Close form
-            if st.session_state.close_row == i:
-                with st.form(f"close_form_{i}"):
-                    st.write("🔒 Provide Closing Details")
-                    comment = st.text_area("Closing Comment", key=f"cmt_{i}")
-                    closed_by = st.text_input("Closed By", key=f"cby_{i}")
-                    action = st.radio("Action", ["Confirm Close", "Cancel"], key=f"close_action_{i}")
-                    submit_close = st.form_submit_button("Submit")
-                    if submit_close:
-                        if action == "Confirm Close":
-                            original_index = df[df["Topic"] == row["Topic"]].index[0]
-                            df.at[original_index, "Status"] = "Closed"
-                            df.at[original_index, "Closing Comment"] = comment
-                            df.at[original_index, "Closed By"] = closed_by
-                            df.at[original_index, "Actual Resolution Date"] = date.today()
-                            save_data(df)
-                            st.success("✅ Topic closed successfully.")
-                        st.session_state.close_row = None
+        if st.session_state.close_row == row_id:
+            with st.form(f"close_form_{row_id}"):
+                comment = st.text_area("Closing Comment", key=f"cmt_{row_id}")
+                closed_by = st.text_input("Closed By", key=f"cby_{row_id}")
+                action = st.radio("Action", ["Confirm Close", "Cancel"], key=f"close_act_{row_id}")
+                submit = st.form_submit_button("Submit")
+                if submit:
+                    if action == "Confirm Close":
+                        df.loc[df["row_id"] == row_id, "Status"] = "Closed"
+                        df.loc[df["row_id"] == row_id, "Closing Comment"] = comment
+                        df.loc[df["row_id"] == row_id, "Closed By"] = closed_by
+                        df.loc[df["row_id"] == row_id, "Actual Resolution Date"] = date.today().isoformat()
+                        save_data(df)
+                        st.success("✅ Topic closed.")
+                    st.session_state.close_row = None
 
-            # Edit form
-            if st.session_state.edit_row == i:
-                with st.form(f"edit_form_{i}"):
-                    st.write("✏️ Edit Topic Details")
-                    new_topic = st.text_input("Topic", value=row["Topic"], key=f"et_{i}")
-                    new_owner = st.text_input("Owner", value=row["Owner"], key=f"eo_{i}")
-                    new_status = st.text_input("Status", value=row["Status"], key=f"es_{i}")
-                    new_date = st.date_input("Target Resolution Date", value=safe_to_date(row["Target Resolution Date"]), key=f"ed_{i}")
-                    action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
-                    submit_edit = st.form_submit_button("Submit")
-                    if submit_edit:
-                        if action == "Save Changes":
-                            original_index = df[df["Topic"] == row["Topic"]].index[0]
-                            df.at[original_index, "Topic"] = new_topic
-                            df.at[original_index, "Owner"] = new_owner
-                            df.at[original_index, "Status"] = new_status
-                            df.at[original_index, "Target Resolution Date"] = new_date
-                            save_data(df)
-                            st.success("✅ Changes saved.")
-                        st.session_state.edit_row = None
+        if st.session_state.edit_row == row_id:
+            with st.form(f"edit_form_{row_id}"):
+                new_topic = st.text_input("Topic", value=row["Topic"], key=f"et_{row_id}")
+                new_owner = st.text_input("Owner", value=row["Owner"], key=f"eo_{row_id}")
+                new_status = st.text_input("Status", value=row["Status"], key=f"es_{row_id}")
+                new_date = st.date_input("Target Resolution Date", pd.to_datetime(row["Target Resolution Date"]), key=f"ed_{row_id}")
+                action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_act_{row_id}")
+                submit = st.form_submit_button("Submit")
+                if submit:
+                    if action == "Save Changes":
+                        df.loc[df["row_id"] == row_id, "Topic"] = new_topic
+                        df.loc[df["row_id"] == row_id, "Owner"] = new_owner
+                        df.loc[df["row_id"] == row_id, "Status"] = new_status
+                        df.loc[df["row_id"] == row_id, "Target Resolution Date"] = new_date
+                        save_data(df)
+                        st.success("✅ Changes saved.")
+                    st.session_state.edit_row = None
 
-    csv = open_df.to_csv(index=False).encode("utf-8")
+    csv = df_open.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Open Topics", data=csv, file_name="open_topics.csv", mime="text/csv")
 
 def closed_topics():
     st.header("✅ Closed Topics")
     df = load_data()
-    closed_df = df[df["Status"].str.lower() == "closed"]
-    if closed_df.empty:
-        st.info("No closed topics found.")
-        return
-    st.dataframe(closed_df)
-    csv = closed_df.to_csv(index=False).encode("utf-8")
+    df_closed = df[df["Status"].str.lower() == "closed"]
+    st.dataframe(df_closed.drop(columns=["row_id"]), use_container_width=True)
+
+    csv = df_closed.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Closed Topics", data=csv, file_name="closed_topics.csv", mime="text/csv")
 
-# Page config and navigation
+# Set page
 st.set_page_config("K-C Tracker", layout="wide")
 st.sidebar.title("📘 KC Tracker Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics"])
 
 if page == "Home":
-    st.title("📘 KC Open Points Tracker")
-    st.markdown("Welcome to the Issue Tracking System. Please choose an option from the left sidebar.")
+    st.title("📘 KC Issue Tracker")
+    st.markdown("Use the left sidebar to navigate between pages.")
 elif page == "Submit Request":
     submit_request()
 elif page == "Open Topics":
