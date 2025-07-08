@@ -51,13 +51,14 @@ def nav_buttons():
 def home():
     st.markdown("<h1 style='color:#0073e6;'>📘 K-C Issue Tracker</h1>", unsafe_allow_html=True)
     st.markdown("Welcome! Please choose an option below:")
+
     if st.button("📝 Submit Request"):
         st.session_state.page = "submit"
         st.experimental_rerun()
-    if st.button("📌 Open Topics"):
+    elif st.button("📌 Open Topics"):
         st.session_state.page = "open"
         st.experimental_rerun()
-    if st.button("✅ Closed Topics"):
+    elif st.button("✅ Closed Topics"):
         st.session_state.page = "closed"
         st.experimental_rerun()
 
