@@ -5,7 +5,6 @@ from datetime import date
 
 EXCEL_FILE = "KC Open Points.xlsx"
 CSV_FILE = "kc_open_points.csv"
-USER_FILE = "users.csv"
 
 REQUIRED_COLUMNS = [
     "Topic", "Owner", "Status", "Target Resolution Date",
@@ -31,57 +30,12 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-@st.cache_data
-def load_users():
-    if os.path.exists(USER_FILE):
-        return pd.read_csv(USER_FILE)
-    else:
-        # default users
-        return pd.DataFrame([
-            {"username": "admin", "password": "admin", "role": "admin"},
-            {"username": "user", "password": "user", "role": "user"},
-        ])
-
-# Initialize session state
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "role" not in st.session_state:
-    st.session_state.role = ""
 if "page" not in st.session_state:
     st.session_state.page = "home"
 if "close_row" not in st.session_state:
     st.session_state.close_row = None
 if "edit_row" not in st.session_state:
     st.session_state.edit_row = None
-
-def login():
-    st.sidebar.title("🔐 Login")
-
-    if not st.session_state.logged_in:
-        username = st.sidebar.text_input("Username")
-        password = st.sidebar.text_input("Password", type="password")
-        if st.sidebar.button("Login"):
-            users_df = load_users()
-            user_row = users_df[users_df["username"] == username]
-            if not user_row.empty and user_row.iloc[0]["password"] == password:
-                st.session_state.logged_in = True
-                st.session_state.username = username
-                st.session_state.role = user_row.iloc[0]["role"]
-                st.experimental_rerun()  # rerun after login success
-            else:
-                st.sidebar.error("❌ Invalid username or password")
-        st.stop()  # stop rendering app until logged in
-
-    else:
-        st.sidebar.success(f"👤 {st.session_state.username} ({st.session_state.role})")
-        if st.sidebar.button("Logout"):
-            st.session_state.logged_in = False
-            st.session_state.username = ""
-            st.session_state.role = ""
-            st.session_state.page = "home"
-            st.experimental_rerun()
 
 def nav_buttons():
     col1, col2 = st.columns(2)
@@ -236,8 +190,6 @@ def closed_topics():
     )
 
 st.set_page_config(page_title="K-C Tracker", layout="wide")
-
-login()
 
 if st.session_state.page == "home":
     home()
