@@ -116,9 +116,12 @@ def open_topics():
                             df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                             save_data(df)
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
+                            st.session_state.close_row = None
+                            st.experimental_rerun()
                         else:
                             st.info("Close operation cancelled.")
-                        st.session_state.close_row = None
+                            st.session_state.close_row = None
+                            st.experimental_rerun()
 
             # Edit dialog
             if "edit_row" in st.session_state and st.session_state.edit_row == i:
@@ -145,13 +148,15 @@ def open_topics():
                             df.loc[df["Topic"] == new_topic, "Target Resolution Date"] = new_date
                             save_data(df)
                             st.success(f"✅ '{new_topic}' updated successfully.")
+                            st.session_state.edit_row = None
+                            st.experimental_rerun()
                         else:
                             st.info("Edit operation cancelled.")
-                        st.session_state.edit_row = None
+                            st.session_state.edit_row = None
+                            st.experimental_rerun()
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-    # Open the dialog when user clicks buttons
     if clicked_close is not None:
         st.session_state.close_row = clicked_close
         st.session_state.edit_row = None
