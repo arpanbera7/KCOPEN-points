@@ -42,24 +42,24 @@ def nav_buttons():
     with col1:
         if st.button("🏠 Home"):
             st.session_state.page = "home"
-            st.rerun()
+            st.experimental_rerun()
     with col2:
         if st.button("🔙 Back"):
             st.session_state.page = "home"
-            st.rerun()
+            st.experimental_rerun()
 
 def home():
     st.markdown("<h1 style='color:#0073e6;'>📘 K-C Issue Tracker</h1>", unsafe_allow_html=True)
     st.markdown("Welcome! Please choose an option below:")
     if st.button("📝 Submit Request"):
         st.session_state.page = "submit"
-        st.rerun()
+        st.experimental_rerun()
     if st.button("📌 Open Topics"):
         st.session_state.page = "open"
-        st.rerun()
+        st.experimental_rerun()
     if st.button("✅ Closed Topics"):
         st.session_state.page = "closed"
-        st.rerun()
+        st.experimental_rerun()
 
 def submit_request():
     st.markdown("<h2 style='color:#0073e6;'>📝 Submit Your Request</h2>", unsafe_allow_html=True)
@@ -68,7 +68,7 @@ def submit_request():
         topic = st.text_input("Topic")
         owner = st.text_input("Owner")
         status = st.text_input("Status")
-        target_resolution_date = st.date_input("Target Resolution Date", format="YYYY-MM-DD")
+        target_resolution_date = st.date_input("Target Resolution Date")
         submitted = st.form_submit_button("Submit")
         if submitted:
             new_entry = pd.DataFrame([{
@@ -82,6 +82,16 @@ def submit_request():
             }])
             new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success("✅ Entry submitted successfully!")
+
+def safe_to_datetime(date_val):
+    try:
+        dt = pd.to_datetime(date_val, errors='coerce')
+        if pd.isna(dt):
+            return date.today()
+        else:
+            return dt.date()
+    except Exception:
+        return date.today()
 
 def open_topics():
     st.markdown("<h2 style='color:#0073e6;'>📌 Open Topics</h2>", unsafe_allow_html=True)
@@ -114,12 +124,12 @@ def open_topics():
                     if st.button("Close", key=f"close_btn_{i}"):
                         st.session_state.close_row = i
                         st.session_state.edit_row = None
-                        st.rerun()
+                        st.experimental_rerun()
                 with cols[5]:
                     if st.button("Edit", key=f"edit_btn_{i}"):
                         st.session_state.edit_row = i
                         st.session_state.close_row = None
-                        st.rerun()
+                        st.experimental_rerun()
 
                 if st.session_state.close_row == i:
                     with st.form(f"close_form_{i}"):
@@ -137,7 +147,7 @@ def open_topics():
                                 save_data(df)
                                 st.success(f"✅ '{row['Topic']}' marked as Closed.")
                             st.session_state.close_row = None
-                            st.rerun()
+                            # No st.experimental_rerun() here
 
                 if st.session_state.edit_row == i:
                     with st.form(f"edit_form_{i}"):
@@ -145,7 +155,11 @@ def open_topics():
                         new_topic = st.text_input("Topic", value=row["Topic"], key=f"edit_topic_{i}")
                         new_owner = st.text_input("Owner", value=row["Owner"], key=f"edit_owner_{i}")
                         new_status = st.text_input("Status", value=row["Status"], key=f"edit_status_{i}")
-                        new_date = st.date_input("Target Resolution Date", value=pd.to_datetime(row["Target Resolution Date"]), key=f"edit_date_{i}")
+                        new_date = st.date_input(
+                            "Target Resolution Date",
+                            value=safe_to_datetime(row["Target Resolution Date"]),
+                            key=f"edit_date_{i}"
+                        )
                         action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
                         submitted = st.form_submit_button("Submit")
 
@@ -158,7 +172,7 @@ def open_topics():
                                 save_data(df)
                                 st.success(f"✅ '{new_topic}' updated successfully.")
                             st.session_state.edit_row = None
-                            st.rerun()
+                            # No st.experimental_rerun() here
 
                 st.markdown("</div>", unsafe_allow_html=True)
 
