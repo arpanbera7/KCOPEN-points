@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import date, datetime
+from datetime import date
 
 EXCEL_FILE = "KC Open Points.xlsx"
 CSV_FILE = "kc_open_points.csv"
@@ -30,7 +30,6 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# Initialize session state variables safely
 if "page" not in st.session_state:
     st.session_state.page = "home"
 if "history" not in st.session_state:
@@ -44,7 +43,6 @@ def nav_buttons():
     col1, col2 = st.columns([1,1])
     with col1:
         if st.button("🏠 Home"):
-            # Update state and rerun here
             st.session_state.page = "home"
             st.session_state.history = []
             st.session_state.edit_row = None
@@ -169,83 +167,3 @@ def open_topics():
                             df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                             save_data(df)
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
-                        st.session_state.close_row = None
-                        st.experimental_rerun()
-
-            if st.session_state.edit_row == i:
-                with st.form(f"edit_form_{i}"):
-                    st.markdown("**✏️ Edit Topic Details**")
-                    new_topic = st.text_input("Topic", value=row["Topic"], key=f"edit_topic_{i}")
-                    new_owner = st.text_input("Owner", value=row["Owner"], key=f"edit_owner_{i}")
-                    new_status = st.text_input("Status", value=row["Status"], key=f"edit_status_{i}")
-                    new_date = st.date_input(
-                        "Target Resolution Date",
-                        value=safe_to_date(row["Target Resolution Date"]),
-                        key=f"edit_date_{i}"
-                    )
-                    action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
-                    submitted = st.form_submit_button("Submit")
-                    if submitted:
-                        if action == "Save Changes":
-                            df.loc[df["Topic"] == row["Topic"], "Topic"] = new_topic
-                            df.loc[df["Topic"] == new_topic, "Owner"] = new_owner
-                            df.loc[df["Topic"] == new_topic, "Status"] = new_status
-                            df.loc[df["Topic"] == new_topic, "Target Resolution Date"] = new_date
-                            save_data(df)
-                            st.success(f"✅ '{new_topic}' updated successfully.")
-                        st.session_state.edit_row = None
-                        st.experimental_rerun()
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
-    # Update session state AFTER iter to avoid conflicts
-    if clicked_close is not None:
-        st.session_state.close_row = clicked_close
-        st.session_state.edit_row = None
-        st.experimental_rerun()
-
-    if clicked_edit is not None:
-        st.session_state.edit_row = clicked_edit
-        st.session_state.close_row = None
-        st.experimental_rerun()
-
-    csv = open_df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="⬇️ Download Open Topics as CSV",
-        data=csv,
-        file_name='open_topics.csv',
-        mime='text/csv'
-    )
-
-def closed_topics():
-    st.markdown("<h2 style='color:#0073e6;'>✅ Closed Topics</h2>", unsafe_allow_html=True)
-    nav_buttons()
-    df = load_data()
-    closed_df = df[df["Status"].str.lower() == "closed"]
-    if not closed_df.empty:
-        st.dataframe(closed_df[[
-            "Topic", "Owner", "Target Resolution Date",
-            "Actual Resolution Date", "Closed By", "Closing Comment"
-        ]], use_container_width=True)
-
-        csv = closed_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="⬇️ Download Closed Topics as CSV",
-            data=csv,
-            file_name='closed_topics.csv',
-            mime='text/csv'
-        )
-    else:
-        st.info("No closed topics available.")
-
-# Page routing and app start
-st.set_page_config(page_title="K-C Tracker", layout="wide")
-
-if st.session_state.page == "home":
-    home()
-elif st.session_state.page == "submit":
-    submit_request()
-elif st.session_state.page == "open":
-    open_topics()
-elif st.session_state.page == "closed":
-    closed_topics()
