@@ -8,13 +8,12 @@ CSV_FILE = "kc_open_points.csv"
 USER_FILE = "users.csv"
 LOG_FILE = "edit_log.csv"
 
-# Columns expected in the data file
 REQUIRED_COLUMNS = [
     "Topic", "Owner", "Status", "Target Resolution Date",
     "Closing Comment", "Closed By", "Actual Resolution Date"
 ]
 
-# -------------- Utility Functions ------------------
+# --- Utility Functions ---
 
 @st.cache_data
 def load_data():
@@ -26,11 +25,11 @@ def load_data():
     for col in REQUIRED_COLUMNS:
         if col not in df.columns:
             df[col] = ""
-    df["row_id"] = range(len(df))  # unique in-memory ID for edits
+    df["row_id"] = range(len(df))  # in-memory unique id
     return df
 
 def save_data(df):
-    df.drop(columns=["row_id"], inplace=True, errors='ignore')
+    df = df.drop(columns=["row_id"], errors="ignore")
     df.to_csv(CSV_FILE, index=False)
     st.cache_data.clear()
 
@@ -45,15 +44,15 @@ def load_users():
 def log_edit(old_row, new_row, editor):
     changes = []
     for field in ["Topic", "Owner", "Status", "Target Resolution Date"]:
-        old_val = str(old_row[field])
-        new_val = str(new_row[field])
+        old_val = str(old_row.get(field, ""))
+        new_val = str(new_row.get(field, ""))
         if old_val != new_val:
             changes.append({
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "edited_by": editor,
                 "field_changed": field,
-                "topic_before": old_val,
-                "topic_after": new_val
+                "old_value": old_val,
+                "new_value": new_val
             })
     if changes:
         df_log = pd.DataFrame(changes)
@@ -62,7 +61,7 @@ def log_edit(old_row, new_row, editor):
         else:
             df_log.to_csv(LOG_FILE, mode="w", header=True, index=False)
 
-# ---------------- Login ------------------
+# --- Login ---
 
 def login():
     st.sidebar.title("🔐 Login")
@@ -83,16 +82,17 @@ def login():
                 st.session_state.username = username
                 st.session_state.role = user_row.iloc[0]["role"]
                 st.sidebar.success(f"✅ Welcome, {username}")
+                st.experimental_rerun()
             else:
                 st.sidebar.error("❌ Invalid username or password")
-        st.stop()
+        st.stop()  # Stop further execution until login
     else:
         st.sidebar.info(f"👤 {st.session_state.username} ({st.session_state.role})")
         if st.sidebar.button("Logout"):
             st.session_state.logged_in = False
             st.experimental_rerun()
 
-# ---------------- Pages ------------------
+# --- Pages ---
 
 def submit_request():
     if st.session_state.role not in ["editor", "admin"]:
@@ -139,7 +139,6 @@ def open_topics():
         cols[2].markdown(row["Status"])
         cols[3].markdown(str(row["Target Resolution Date"]))
 
-        # Show buttons only for editors/admins
         can_edit = st.session_state.role in ["editor", "admin"]
 
         if can_edit and cols[4].button("Close", key=f"close_{row_id}"):
@@ -165,13 +164,18 @@ def open_topics():
                         save_data(df)
                         st.success("✅ Topic closed.")
                     st.session_state.close_row = None
+                    st.experimental_rerun()
 
         if st.session_state.edit_row == row_id:
             with st.form(f"edit_form_{row_id}"):
                 new_topic = st.text_input("Topic", value=row["Topic"], key=f"et_{row_id}")
                 new_owner = st.text_input("Owner", value=row["Owner"], key=f"eo_{row_id}")
                 new_status = st.text_input("Status", value=row["Status"], key=f"es_{row_id}")
-                new_date = st.date_input("Target Resolution Date", pd.to_datetime(row["Target Resolution Date"]), key=f"ed_{row_id}")
+                try:
+                    new_date_val = pd.to_datetime(row["Target Resolution Date"])
+                except:
+                    new_date_val = date.today()
+                new_date = st.date_input("Target Resolution Date", new_date_val, key=f"ed_{row_id}")
                 action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_act_{row_id}")
                 submit = st.form_submit_button("Submit")
                 if submit:
@@ -183,16 +187,15 @@ def open_topics():
                             "Status": new_status,
                             "Target Resolution Date": new_date
                         }
-                        # Update dataframe
                         df.loc[df["row_id"] == row_id, "Topic"] = new_topic
                         df.loc[df["row_id"] == row_id, "Owner"] = new_owner
                         df.loc[df["row_id"] == row_id, "Status"] = new_status
                         df.loc[df["row_id"] == row_id, "Target Resolution Date"] = new_date
-                        # Log the edit
                         log_edit(old_row, new_data, st.session_state.username)
                         save_data(df)
                         st.success("✅ Changes saved.")
                     st.session_state.edit_row = None
+                    st.experimental_rerun()
 
     csv = df_open.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Open Topics", data=csv, file_name="open_topics.csv", mime="text/csv")
@@ -219,14 +222,16 @@ def view_edit_logs():
     else:
         st.info("No edits have been logged yet.")
 
-# ----------------- Main -------------------
+# --- Main ---
 
 st.set_page_config("K-C Tracker", layout="wide")
 
 login()
 
+role = st.session_state.role
+
 # Sidebar navigation based on role
-if st.session_state.role == "admin":
+if role == "admin":
     page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics", "Edit Log"])
 else:
     page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics"])
