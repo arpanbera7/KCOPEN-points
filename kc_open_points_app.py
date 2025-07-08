@@ -45,7 +45,7 @@ def safe_to_date(val):
 
 def home():
     st.title("📘 K-C Issue Tracker")
-    st.write("Welcome! Use the sidebar to navigate.")
+    st.write("Welcome! Use the sidebar to navigate between pages.")
 
 def submit_request():
     st.header("📝 Submit Your Request")
@@ -99,6 +99,7 @@ def open_topics():
             if cols[5].button("Edit", key=f"edit_btn_{i}"):
                 clicked_edit = i
 
+            # Close dialog
             if "close_row" in st.session_state and st.session_state.close_row == i:
                 with st.form(f"close_form_{i}"):
                     st.markdown("**🔒 Provide Closing Details**")
@@ -114,8 +115,10 @@ def open_topics():
                             df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                             save_data(df)
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
+                        # Close dialog on Confirm or Cancel
                         st.session_state.close_row = None
 
+            # Edit dialog
             if "edit_row" in st.session_state and st.session_state.edit_row == i:
                 with st.form(f"edit_form_{i}"):
                     st.markdown("**✏️ Edit Topic Details**")
@@ -137,10 +140,12 @@ def open_topics():
                             df.loc[df["Topic"] == new_topic, "Target Resolution Date"] = new_date
                             save_data(df)
                             st.success(f"✅ '{new_topic}' updated successfully.")
+                        # Close dialog on Save or Cancel
                         st.session_state.edit_row = None
 
             st.markdown("</div>", unsafe_allow_html=True)
 
+    # Open the dialog when user clicks buttons
     if clicked_close is not None:
         st.session_state.close_row = clicked_close
         st.session_state.edit_row = None
@@ -182,14 +187,12 @@ def closed_topics():
         mime='text/csv'
     )
 
-
 # Sidebar navigation
-page = st.sidebar.selectbox(
-    "Navigation",
-    ("Home", "Submit Request", "Open Topics", "Closed Topics")
-)
-
 st.set_page_config(page_title="K-C Tracker", layout="wide")
+page = st.sidebar.selectbox(
+    "Navigate",
+    ["Home", "Submit Request", "Open Topics", "Closed Topics"]
+)
 
 if page == "Home":
     home()
