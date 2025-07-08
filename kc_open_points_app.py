@@ -56,10 +56,12 @@ def home():
     if st.button("📝 Submit Request"):
         st.session_state.page = "submit"
         st.experimental_rerun()
-    elif st.button("📌 Open Topics"):
+
+    if st.button("📌 Open Topics"):
         st.session_state.page = "open"
         st.experimental_rerun()
-    elif st.button("✅ Closed Topics"):
+
+    if st.button("✅ Closed Topics"):
         st.session_state.page = "closed"
         st.experimental_rerun()
 
