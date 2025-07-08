@@ -43,6 +43,8 @@ def style_table(df):
 
 if "page" not in st.session_state:
     st.session_state.page = "home"
+if "close_row" not in st.session_state:
+    st.session_state.close_row = None
 
 def nav_buttons():
     col1, col2 = st.columns([1, 1])
@@ -98,30 +100,38 @@ def open_topics():
 
     if not open_df.empty:
         st.markdown("### 🗂️ Topics Table")
-        header = st.columns([3, 2, 2, 3, 3])
+        header = st.columns([3, 2, 2, 3, 2])
         header[0].markdown("**Topic**")
         header[1].markdown("**Owner**")
         header[2].markdown("**Status**")
         header[3].markdown("**Target Date**")
-        header[4].markdown("**Close Action**")
+        header[4].markdown("**Action**")
 
         for i, row in open_df.iterrows():
-            cols = st.columns([3, 2, 2, 3, 3])
+            cols = st.columns([3, 2, 2, 3, 2])
             cols[0].markdown(row["Topic"])
             cols[1].markdown(row["Owner"])
             cols[2].markdown(row["Status"])
             cols[3].markdown(row["Target Resolution Date"])
             with cols[4]:
+                if st.button("Close", key=f"close_btn_{i}"):
+                    st.session_state.close_row = i
+                    st.rerun()
+
+            # Show close form only for selected row
+            if st.session_state.close_row == i:
                 with st.form(f"close_form_{i}"):
-                    comment = st.text_input("Comment", key=f"comment_{i}")
+                    st.markdown("**🔒 Provide Closing Details**")
+                    comment = st.text_area("Closing Comment", key=f"comment_{i}")
                     closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
-                    if st.form_submit_button("Close"):
+                    if st.form_submit_button("Confirm Close"):
                         df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
                         df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = comment
                         df.loc[df["Topic"] == row["Topic"], "Closed By"] = closed_by
                         df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                         save_data(df)
                         st.success(f"✅ '{row['Topic']}' marked as Closed.")
+                        st.session_state.close_row = None
                         st.rerun()
 
         # Download Open Topics
