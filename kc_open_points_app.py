@@ -1,75 +1,56 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, datetime
 import os
+from datetime import date
 
-# File paths
+EXCEL_FILE = "KC Open Points.xlsx"
 CSV_FILE = "kc_open_points.csv"
 USER_FILE = "users.csv"
-LOG_FILE = "edit_log.csv"
 
 REQUIRED_COLUMNS = [
     "Topic", "Owner", "Status", "Target Resolution Date",
     "Closing Comment", "Closed By", "Actual Resolution Date"
 ]
 
-# --- Utility Functions ---
-
+# Load data with required columns
 @st.cache_data
 def load_data():
     if os.path.exists(CSV_FILE):
         df = pd.read_csv(CSV_FILE)
     else:
-        st.error(f"{CSV_FILE} not found.")
-        return pd.DataFrame(columns=REQUIRED_COLUMNS)
+        df = pd.read_excel(EXCEL_FILE, sheet_name=0, engine="openpyxl")
+        df.rename(columns={"Resolution Date": "Target Resolution Date"}, inplace=True)
+        df["Closing Comment"] = ""
+        df["Closed By"] = ""
+        df["Actual Resolution Date"] = ""
+        df.to_csv(CSV_FILE, index=False)
     for col in REQUIRED_COLUMNS:
         if col not in df.columns:
             df[col] = ""
-    df["row_id"] = range(len(df))  # unique row id for editing
-    return df
+    return df[REQUIRED_COLUMNS]
 
 def save_data(df):
-    df = df.drop(columns=["row_id"], errors="ignore")
     df.to_csv(CSV_FILE, index=False)
-    st.cache_data.clear()
 
+# Load users for login
 @st.cache_data
 def load_users():
     if os.path.exists(USER_FILE):
         return pd.read_csv(USER_FILE)
     else:
-        st.error(f"{USER_FILE} not found.")
-        return pd.DataFrame(columns=["username", "password", "role"])
+        # Default admin user if file missing
+        return pd.DataFrame([
+            {"username": "admin", "password": "admin", "role": "admin"},
+            {"username": "user", "password": "user", "role": "user"}
+        ])
 
-def log_edit(old_row, new_row, editor):
-    changes = []
-    for field in ["Topic", "Owner", "Status", "Target Resolution Date"]:
-        old_val = str(old_row.get(field, ""))
-        new_val = str(new_row.get(field, ""))
-        if old_val != new_val:
-            changes.append({
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "edited_by": editor,
-                "field_changed": field,
-                "old_value": old_val,
-                "new_value": new_val
-            })
-    if changes:
-        df_log = pd.DataFrame(changes)
-        if os.path.exists(LOG_FILE):
-            df_log.to_csv(LOG_FILE, mode="a", header=False, index=False)
-        else:
-            df_log.to_csv(LOG_FILE, mode="w", header=True, index=False)
-
-# --- Login ---
-
+# --- Login function ---
 def login():
     st.sidebar.title("🔐 Login")
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
         st.session_state.username = ""
         st.session_state.role = ""
-        st.session_state.login_attempted = False
 
     users_df = load_users()
 
@@ -84,175 +65,191 @@ def login():
                 st.session_state.logged_in = True
                 st.session_state.username = username
                 st.session_state.role = user_row.iloc[0]["role"]
+                st.experimental_rerun()
             else:
                 st.sidebar.error("❌ Invalid username or password")
 
-            st.session_state.login_attempted = True
+        st.stop()  # Stop until logged in
 
-        # Call rerun only once, outside of the button callback
-        if st.session_state.login_attempted:
-            st.session_state.login_attempted = False
-            st.experimental_rerun()
-
-        st.stop()
     else:
-        st.sidebar.info(f"👤 {st.session_state.username} ({st.session_state.role})")
+        st.sidebar.success(f"👤 {st.session_state.username} ({st.session_state.role})")
         if st.sidebar.button("Logout"):
             st.session_state.logged_in = False
+            st.session_state.username = ""
+            st.session_state.role = ""
             st.experimental_rerun()
 
+# --- Navigation ---
+def nav_buttons():
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("🏠 Home"):
+            st.session_state.page = "home"
+            st.experimental_rerun()
+    with col2:
+        if st.button("🔙 Back"):
+            # Simple back logic: from open or closed back to home
+            if st.session_state.page in ["open", "closed", "submit"]:
+                st.session_state.page = "home"
+                st.experimental_rerun()
+
 # --- Pages ---
+def home():
+    st.title("📘 K-C Issue Tracker")
+    st.write("Welcome! Please choose an option below:")
+    if st.button("📝 Submit Request"):
+        st.session_state.page = "submit"
+        st.experimental_rerun()
+    if st.button("📌 Open Topics"):
+        st.session_state.page = "open"
+        st.experimental_rerun()
+    if st.button("✅ Closed Topics"):
+        st.session_state.page = "closed"
+        st.experimental_rerun()
 
 def submit_request():
-    if st.session_state.role not in ["editor", "admin"]:
-        st.warning("🚫 You don't have permission to submit requests.")
-        return
-    st.header("📝 Submit Request")
-    with st.form("form_submit"):
+    st.header("📝 Submit Your Request")
+    nav_buttons()
+    with st.form("entry_form"):
         topic = st.text_input("Topic")
         owner = st.text_input("Owner")
         status = st.text_input("Status")
-        target_date = st.date_input("Target Resolution Date")
+        target_resolution_date = st.date_input("Target Resolution Date")
         submitted = st.form_submit_button("Submit")
         if submitted:
             df = load_data()
-            new_row = {
+            new_entry = pd.DataFrame([{
                 "Topic": topic,
                 "Owner": owner,
                 "Status": status,
-                "Target Resolution Date": target_date,
+                "Target Resolution Date": target_resolution_date,
                 "Closing Comment": "",
                 "Closed By": "",
                 "Actual Resolution Date": ""
-            }
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            }])
+            df = pd.concat([df, new_entry], ignore_index=True)
             save_data(df)
-            st.success("✅ Request submitted successfully!")
+            st.success("✅ Entry submitted successfully!")
 
 def open_topics():
     st.header("📌 Open Topics")
+    nav_buttons()
     df = load_data()
-    df_open = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
+    open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
-    if "edit_row" not in st.session_state:
-        st.session_state.edit_row = None
-    if "close_row" not in st.session_state:
-        st.session_state.close_row = None
+    if open_df.empty:
+        st.info("No open topics available.")
+        return
 
-    for _, row in df_open.iterrows():
-        row_id = row["row_id"]
-        st.markdown("---")
-        cols = st.columns([3, 2, 2, 3, 1, 1])
-        cols[0].markdown(f"**{row['Topic']}**")
-        cols[1].markdown(row["Owner"])
-        cols[2].markdown(row["Status"])
-        cols[3].markdown(str(row["Target Resolution Date"]))
+    st.markdown("### 🗂️ Topics Table")
 
-        can_edit = st.session_state.role in ["editor", "admin"]
+    header = st.columns([3, 2, 2, 3, 1, 1])
+    header[0].markdown("**Topic**")
+    header[1].markdown("**Owner**")
+    header[2].markdown("**Status**")
+    header[3].markdown("**Target Date**")
+    header[4].markdown("**Close**")
+    header[5].markdown("**Edit**")
 
-        if can_edit and cols[4].button("Close", key=f"close_{row_id}"):
-            st.session_state.close_row = row_id
-            st.session_state.edit_row = None
+    for i, row in open_df.iterrows():
+        with st.container():
+            cols = st.columns([3, 2, 2, 3, 1, 1])
+            cols[0].write(row["Topic"])
+            cols[1].write(row["Owner"])
+            cols[2].write(row["Status"])
+            cols[3].write(row["Target Resolution Date"])
 
-        if can_edit and cols[5].button("Edit", key=f"edit_{row_id}"):
-            st.session_state.edit_row = row_id
-            st.session_state.close_row = None
+            if cols[4].button("Close", key=f"close_btn_{i}"):
+                st.session_state.close_row = i
+                st.session_state.edit_row = None
 
-        if st.session_state.close_row == row_id:
-            with st.form(f"close_form_{row_id}"):
-                comment = st.text_area("Closing Comment", key=f"cmt_{row_id}")
-                closed_by = st.text_input("Closed By", key=f"cby_{row_id}")
-                action = st.radio("Action", ["Confirm Close", "Cancel"], key=f"close_act_{row_id}")
-                submit = st.form_submit_button("Submit")
-                if submit:
+            if cols[5].button("Edit", key=f"edit_btn_{i}"):
+                st.session_state.edit_row = i
+                st.session_state.close_row = None
+
+        # Close dialog
+        if st.session_state.get("close_row") == i:
+            with st.form(f"close_form_{i}"):
+                st.write(f"🔒 Close topic: **{row['Topic']}**")
+                comment = st.text_area("Closing Comment", key=f"comment_{i}")
+                closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
+                action = st.radio("Action", ["Confirm Close", "Cancel"], key=f"close_action_{i}")
+                submitted = st.form_submit_button("Submit")
+                if submitted:
                     if action == "Confirm Close":
-                        df.loc[df["row_id"] == row_id, "Status"] = "Closed"
-                        df.loc[df["row_id"] == row_id, "Closing Comment"] = comment
-                        df.loc[df["row_id"] == row_id, "Closed By"] = closed_by
-                        df.loc[df["row_id"] == row_id, "Actual Resolution Date"] = date.today().isoformat()
+                        df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
+                        df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = comment
+                        df.loc[df["Topic"] == row["Topic"], "Closed By"] = closed_by
+                        df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                         save_data(df)
-                        st.success("✅ Topic closed.")
+                        st.success(f"✅ '{row['Topic']}' marked as Closed.")
                     st.session_state.close_row = None
                     st.experimental_rerun()
 
-        if st.session_state.edit_row == row_id:
-            with st.form(f"edit_form_{row_id}"):
-                new_topic = st.text_input("Topic", value=row["Topic"], key=f"et_{row_id}")
-                new_owner = st.text_input("Owner", value=row["Owner"], key=f"eo_{row_id}")
-                new_status = st.text_input("Status", value=row["Status"], key=f"es_{row_id}")
-                try:
-                    new_date_val = pd.to_datetime(row["Target Resolution Date"])
-                except:
-                    new_date_val = date.today()
-                new_date = st.date_input("Target Resolution Date", new_date_val, key=f"ed_{row_id}")
-                action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_act_{row_id}")
-                submit = st.form_submit_button("Submit")
-                if submit:
+        # Edit dialog
+        if st.session_state.get("edit_row") == i:
+            with st.form(f"edit_form_{i}"):
+                st.write(f"✏️ Edit topic: **{row['Topic']}**")
+                new_topic = st.text_input("Topic", value=row["Topic"], key=f"edit_topic_{i}")
+                new_owner = st.text_input("Owner", value=row["Owner"], key=f"edit_owner_{i}")
+                new_status = st.text_input("Status", value=row["Status"], key=f"edit_status_{i}")
+                new_date = st.date_input("Target Resolution Date", value=pd.to_datetime(row["Target Resolution Date"]), key=f"edit_date_{i}")
+                action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
+                submitted = st.form_submit_button("Submit")
+
+                if submitted:
                     if action == "Save Changes":
-                        old_row = row.copy()
-                        new_data = {
-                            "Topic": new_topic,
-                            "Owner": new_owner,
-                            "Status": new_status,
-                            "Target Resolution Date": new_date
-                        }
-                        df.loc[df["row_id"] == row_id, "Topic"] = new_topic
-                        df.loc[df["row_id"] == row_id, "Owner"] = new_owner
-                        df.loc[df["row_id"] == row_id, "Status"] = new_status
-                        df.loc[df["row_id"] == row_id, "Target Resolution Date"] = new_date
-                        log_edit(old_row, new_data, st.session_state.username)
+                        df.loc[df["Topic"] == row["Topic"], "Topic"] = new_topic
+                        df.loc[df["Topic"] == new_topic, "Owner"] = new_owner
+                        df.loc[df["Topic"] == new_topic, "Status"] = new_status
+                        df.loc[df["Topic"] == new_topic, "Target Resolution Date"] = new_date
                         save_data(df)
-                        st.success("✅ Changes saved.")
+                        st.success(f"✅ '{new_topic}' updated successfully.")
                     st.session_state.edit_row = None
                     st.experimental_rerun()
 
-    csv = df_open.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
-    st.download_button("⬇️ Download Open Topics", data=csv, file_name="open_topics.csv", mime="text/csv")
+    csv = open_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="⬇️ Download Open Topics as CSV",
+        data=csv,
+        file_name='open_topics.csv',
+        mime='text/csv'
+    )
 
 def closed_topics():
     st.header("✅ Closed Topics")
+    nav_buttons()
     df = load_data()
-    df_closed = df[df["Status"].str.lower() == "closed"]
-    st.dataframe(df_closed.drop(columns=["row_id"]), use_container_width=True)
-
-    csv = df_closed.drop(columns=["row_id"]).to_csv(index=False).encode("utf-8")
-    st.download_button("⬇️ Download Closed Topics", data=csv, file_name="closed_topics.csv", mime="text/csv")
-
-def view_edit_logs():
-    if st.session_state.role != "admin":
-        st.warning("🚫 Only admins can view the edit history.")
+    closed_df = df[df["Status"].str.lower() == "closed"]
+    if closed_df.empty:
+        st.info("No closed topics available.")
         return
-    st.header("🛠️ Edit History Log")
-    if os.path.exists(LOG_FILE):
-        logs = pd.read_csv(LOG_FILE)
-        st.dataframe(logs, use_container_width=True)
-        csv = logs.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Download Log", data=csv, file_name="edit_log.csv", mime="text/csv")
-    else:
-        st.info("No edits have been logged yet.")
+    st.dataframe(closed_df[[
+        "Topic", "Owner", "Target Resolution Date",
+        "Actual Resolution Date", "Closed By", "Closing Comment"
+    ]], use_container_width=True)
+
+    csv = closed_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="⬇️ Download Closed Topics as CSV",
+        data=csv,
+        file_name='closed_topics.csv',
+        mime='text/csv'
+    )
 
 # --- Main ---
 
-st.set_page_config("K-C Tracker", layout="wide")
+if "page" not in st.session_state:
+    st.session_state.page = "home"
+st.set_page_config(page_title="K-C Tracker", layout="wide")
 
-login()
+login()  # user must login first
 
-role = st.session_state.role
-
-# Sidebar navigation based on role
-if role == "admin":
-    page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics", "Edit Log"])
-else:
-    page = st.sidebar.radio("Go to", ["Home", "Submit Request", "Open Topics", "Closed Topics"])
-
-if page == "Home":
-    st.title("📘 KC Issue Tracker")
-    st.markdown("Use the left sidebar to navigate between pages.")
-elif page == "Submit Request":
+if st.session_state.page == "home":
+    home()
+elif st.session_state.page == "submit":
     submit_request()
-elif page == "Open Topics":
+elif st.session_state.page == "open":
     open_topics()
-elif page == "Closed Topics":
+elif st.session_state.page == "closed":
     closed_topics()
-elif page == "Edit Log":
-    view_edit_logs()
