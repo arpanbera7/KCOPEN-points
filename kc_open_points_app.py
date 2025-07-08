@@ -7,13 +7,11 @@ from datetime import date
 EXCEL_FILE = "KC Open Points.xlsx"
 CSV_FILE = "kc_open_points.csv"
 
-# Required columns
 REQUIRED_COLUMNS = [
     "Topic", "Owner", "Status", "Target Resolution Date",
     "Closing Comment", "Closed By", "Actual Resolution Date"
 ]
 
-# Load data
 @st.cache_data
 def load_data():
     if os.path.exists(CSV_FILE):
@@ -30,11 +28,9 @@ def load_data():
             df[col] = ""
     return df[REQUIRED_COLUMNS]
 
-# Save data
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# Style table
 def style_table(df):
     return df.style.set_properties(**{
         'background-color': '#f0f8ff',
@@ -45,11 +41,9 @@ def style_table(df):
         'props': [('background-color', '#0073e6'), ('color', 'white'), ('font-weight', 'bold')]
     }])
 
-# Navigation state
 if "page" not in st.session_state:
     st.session_state.page = "home"
 
-# Navigation buttons
 def nav_buttons():
     col1, col2 = st.columns([1, 1])
     with col1:
@@ -61,7 +55,6 @@ def nav_buttons():
             st.session_state.page = "home"
             st.rerun()
 
-# Home Page
 def home():
     st.markdown("<h1 style='color:#0073e6;'>📘 K-C Issue Tracker</h1>", unsafe_allow_html=True)
     st.markdown("Welcome! Please choose an option below:")
@@ -75,7 +68,6 @@ def home():
         st.session_state.page = "closed"
         st.rerun()
 
-# Submit Request Page
 def submit_request():
     st.markdown("<h2 style='color:#0073e6;'>📝 Submit Your Request</h2>", unsafe_allow_html=True)
     nav_buttons()
@@ -98,7 +90,6 @@ def submit_request():
             new_entry.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success("✅ Entry submitted successfully!")
 
-# Open Topics Page with row-wise close buttons and download
 def open_topics():
     st.markdown("<h2 style='color:#0073e6;'>📌 Open Topics</h2>", unsafe_allow_html=True)
     nav_buttons()
@@ -106,22 +97,27 @@ def open_topics():
     open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
     if not open_df.empty:
-        st.markdown("### 🗂️ Topics List")
+        st.markdown("### 🗂️ Topics Table")
+        header = st.columns([3, 2, 2, 3, 3])
+        header[0].markdown("**Topic**")
+        header[1].markdown("**Owner**")
+        header[2].markdown("**Status**")
+        header[3].markdown("**Target Date**")
+        header[4].markdown("**Close Action**")
 
         for i, row in open_df.iterrows():
-            with st.container():
-                st.markdown("---")
-                st.markdown(f"**📝 Topic:** {row['Topic']}")
-                st.markdown(f"**👤 Owner:** {row['Owner']} &nbsp;&nbsp;&nbsp; **📅 Target Date:** {row['Target Resolution Date']} &nbsp;&nbsp;&nbsp; **📌 Status:** {row['Status']}")
-
+            cols = st.columns([3, 2, 2, 3, 3])
+            cols[0].markdown(row["Topic"])
+            cols[1].markdown(row["Owner"])
+            cols[2].markdown(row["Status"])
+            cols[3].markdown(row["Target Resolution Date"])
+            with cols[4]:
                 with st.form(f"close_form_{i}"):
-                    st.markdown("**🔒 Close This Topic**")
-                    closing_comment = st.text_area("Closing Comment", key=f"comment_{i}")
+                    comment = st.text_input("Comment", key=f"comment_{i}")
                     closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
-                    close_submit = st.form_submit_button("Mark as Closed")
-                    if close_submit:
+                    if st.form_submit_button("Close"):
                         df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
-                        df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = closing_comment
+                        df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = comment
                         df.loc[df["Topic"] == row["Topic"], "Closed By"] = closed_by
                         df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                         save_data(df)
@@ -139,7 +135,6 @@ def open_topics():
     else:
         st.info("No open topics available.")
 
-# Closed Topics Page with download
 def closed_topics():
     st.markdown("<h2 style='color:#0073e6;'>✅ Closed Topics</h2>", unsafe_allow_html=True)
     nav_buttons()
@@ -151,7 +146,6 @@ def closed_topics():
             "Actual Resolution Date", "Closed By", "Closing Comment"
         ]]), use_container_width=True)
 
-        # Download Closed Topics
         csv = closed_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="⬇️ Download Closed Topics as CSV",
