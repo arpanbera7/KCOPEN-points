@@ -55,11 +55,11 @@ def nav_buttons():
     with col1:
         if st.button("🏠 Home"):
             st.session_state.page = "home"
-            st.experimental_rerun()
+            st.rerun()
     with col2:
         if st.button("🔙 Back"):
             st.session_state.page = "home"
-            st.experimental_rerun()
+            st.rerun()
 
 # Home Page
 def home():
@@ -67,13 +67,13 @@ def home():
     st.markdown("Welcome! Please choose an option below:")
     if st.button("📝 Submit Request"):
         st.session_state.page = "submit"
-        st.experimental_rerun()
+        st.rerun()
     if st.button("📌 Open Topics"):
         st.session_state.page = "open"
-        st.experimental_rerun()
+        st.rerun()
     if st.button("✅ Closed Topics"):
         st.session_state.page = "closed"
-        st.experimental_rerun()
+        st.rerun()
 
 # Submit Request Page
 def submit_request():
@@ -122,7 +122,7 @@ def open_topics():
                         df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
                         save_data(df)
                         st.success(f"✅ '{row['Topic']}' marked as Closed.")
-                        st.experimental_rerun()
+                        st.rerun()
     else:
         st.info("No open topics available.")
 
