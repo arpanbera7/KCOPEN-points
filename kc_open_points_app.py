@@ -39,8 +39,6 @@ if "close_row" not in st.session_state:
     st.session_state.close_row = None
 if "edit_row" not in st.session_state:
     st.session_state.edit_row = None
-if "need_rerun" not in st.session_state:
-    st.session_state.need_rerun = False
 
 def navigate_to(page):
     if st.session_state.page != page:
@@ -49,7 +47,7 @@ def navigate_to(page):
         st.session_state.edit_row = None
         st.session_state.close_row = None
         st.session_state.page = page
-        st.session_state.need_rerun = True  # Mark rerun requested
+        st.experimental_rerun()
 
 def go_back():
     if st.session_state.history:
@@ -57,7 +55,7 @@ def go_back():
         st.session_state.edit_row = None
         st.session_state.close_row = None
         st.session_state.page = previous
-        st.session_state.need_rerun = True
+        st.experimental_rerun()
     else:
         go_home()
 
@@ -66,7 +64,7 @@ def go_home():
     st.session_state.history = []
     st.session_state.edit_row = None
     st.session_state.close_row = None
-    st.session_state.need_rerun = True
+    st.experimental_rerun()
 
 def nav_buttons():
     col1, col2 = st.columns([1,1])
@@ -110,7 +108,6 @@ def submit_request():
             st.success("✅ Entry submitted successfully!")
 
 def safe_to_date(val):
-    # Convert various formats to datetime.date safely
     if pd.isna(val) or val == "":
         return date.today()
     if isinstance(val, date):
@@ -161,7 +158,6 @@ def open_topics():
             if cols[5].button("Edit", key=f"edit_btn_{i}"):
                 clicked_edit = i
 
-            # Close form
             if st.session_state.close_row == i:
                 with st.form(f"close_form_{i}"):
                     st.markdown("**🔒 Provide Closing Details**")
@@ -178,9 +174,8 @@ def open_topics():
                             save_data(df)
                             st.success(f"✅ '{row['Topic']}' marked as Closed.")
                         st.session_state.close_row = None
-                        st.session_state.need_rerun = True
+                        st.experimental_rerun()
 
-            # Edit form
             if st.session_state.edit_row == i:
                 with st.form(f"edit_form_{i}"):
                     st.markdown("**✏️ Edit Topic Details**")
@@ -203,20 +198,20 @@ def open_topics():
                             save_data(df)
                             st.success(f"✅ '{new_topic}' updated successfully.")
                         st.session_state.edit_row = None
-                        st.session_state.need_rerun = True
+                        st.experimental_rerun()
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-    # Handle clicks AFTER rendering all rows to avoid state conflicts
+    # Update session state AFTER iter to avoid conflicts
     if clicked_close is not None:
         st.session_state.close_row = clicked_close
         st.session_state.edit_row = None
-        st.session_state.need_rerun = True
+        st.experimental_rerun()
 
     if clicked_edit is not None:
         st.session_state.edit_row = clicked_edit
         st.session_state.close_row = None
-        st.session_state.need_rerun = True
+        st.experimental_rerun()
 
     csv = open_df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -247,8 +242,7 @@ def closed_topics():
     else:
         st.info("No closed topics available.")
 
-# Page routing and rerun control
-
+# Page routing and app start
 st.set_page_config(page_title="K-C Tracker", layout="wide")
 
 if st.session_state.page == "home":
@@ -259,8 +253,3 @@ elif st.session_state.page == "open":
     open_topics()
 elif st.session_state.page == "closed":
     closed_topics()
-
-# Single rerun call if needed, after all UI logic done
-if st.session_state.need_rerun:
-    st.session_state.need_rerun = False
-    st.experimental_rerun()
