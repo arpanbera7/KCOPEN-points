@@ -107,17 +107,18 @@ def open_topics():
 
     if not open_df.empty:
         st.markdown("### 🗂️ Topics List")
+
         for i, row in open_df.iterrows():
-            cols = st.columns([3, 2, 2, 3, 2])
-            cols[0].markdown(f"**{row['Topic']}**")
-            cols[1].markdown(row["Owner"])
-            cols[2].markdown(row["Status"])
-            cols[3].markdown(row["Target Resolution Date"])
-            with cols[4]:
+            with st.container():
+                st.markdown("---")
+                st.markdown(f"**📝 Topic:** {row['Topic']}")
+                st.markdown(f"**👤 Owner:** {row['Owner']} &nbsp;&nbsp;&nbsp; **📅 Target Date:** {row['Target Resolution Date']} &nbsp;&nbsp;&nbsp; **📌 Status:** {row['Status']}")
+
                 with st.form(f"close_form_{i}"):
-                    closing_comment = st.text_input("Comment", key=f"comment_{i}")
+                    st.markdown("**🔒 Close This Topic**")
+                    closing_comment = st.text_area("Closing Comment", key=f"comment_{i}")
                     closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
-                    close_submit = st.form_submit_button("Close")
+                    close_submit = st.form_submit_button("Mark as Closed")
                     if close_submit:
                         df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
                         df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = closing_comment
