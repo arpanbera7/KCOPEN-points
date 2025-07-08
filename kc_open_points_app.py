@@ -30,6 +30,7 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
+# Initialize session state keys if not present
 if "page" not in st.session_state:
     st.session_state.page = "home"
 if "close_row" not in st.session_state:
@@ -85,6 +86,7 @@ def submit_request():
             st.success("✅ Entry submitted successfully!")
 
 def safe_to_date(date_val):
+    # Convert to Python date or fallback to today if invalid
     if isinstance(date_val, (datetime, pd.Timestamp)):
         return date_val.date()
     if isinstance(date_val, date):
@@ -104,90 +106,104 @@ def open_topics():
     df = load_data()
     open_df = df[df["Status"].str.lower() != "closed"].reset_index(drop=True)
 
-    if not open_df.empty:
-        st.markdown("### 🗂️ Topics Table")
+    if open_df.empty:
+        st.info("No open topics available.")
+        return
 
-        header = st.columns([3, 2, 2, 3, 1, 1])
-        header[0].markdown("**Topic**")
-        header[1].markdown("**Owner**")
-        header[2].markdown("**Status**")
-        header[3].markdown("**Target Date**")
-        header[4].markdown("**Close**")
-        header[5].markdown("**Edit**")
+    st.markdown("### 🗂️ Topics Table")
 
-        for i, row in open_df.iterrows():
-            with st.container():
-                row_style = "background-color: #e6f2ff; border: 1px solid #cce6ff; padding: 10px; margin-bottom: 5px;"
-                st.markdown(f"<div style='{row_style}'>", unsafe_allow_html=True)
+    header = st.columns([3, 2, 2, 3, 1, 1])
+    header[0].markdown("**Topic**")
+    header[1].markdown("**Owner**")
+    header[2].markdown("**Status**")
+    header[3].markdown("**Target Date**")
+    header[4].markdown("**Close**")
+    header[5].markdown("**Edit**")
 
-                cols = st.columns([3, 2, 2, 3, 1, 1])
-                cols[0].markdown(row["Topic"])
-                cols[1].markdown(row["Owner"])
-                cols[2].markdown(row["Status"])
-                cols[3].markdown(row["Target Resolution Date"])
-                with cols[4]:
-                    if st.button("Close", key=f"close_btn_{i}"):
-                        st.session_state.close_row = i
-                        st.session_state.edit_row = None
-                        st.experimental_rerun()
-                with cols[5]:
-                    if st.button("Edit", key=f"edit_btn_{i}"):
-                        st.session_state.edit_row = i
+    button_clicked = None  # To track which button clicked outside the loop
+
+    for i, row in open_df.iterrows():
+        with st.container():
+            row_style = "background-color: #e6f2ff; border: 1px solid #cce6ff; padding: 10px; margin-bottom: 5px;"
+            st.markdown(f"<div style='{row_style}'>", unsafe_allow_html=True)
+
+            cols = st.columns([3, 2, 2, 3, 1, 1])
+            cols[0].markdown(row["Topic"])
+            cols[1].markdown(row["Owner"])
+            cols[2].markdown(row["Status"])
+            cols[3].markdown(row["Target Resolution Date"])
+
+            if cols[4].button("Close", key=f"close_btn_{i}"):
+                button_clicked = ("close", i)
+            if cols[5].button("Edit", key=f"edit_btn_{i}"):
+                button_clicked = ("edit", i)
+
+            # Close form UI
+            if st.session_state.close_row == i:
+                with st.form(f"close_form_{i}"):
+                    st.markdown("**🔒 Provide Closing Details**")
+                    comment = st.text_area("Closing Comment", key=f"comment_{i}")
+                    closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
+                    action = st.radio("Action", ["Confirm Close", "Cancel"], key=f"close_action_{i}")
+                    submitted = st.form_submit_button("Submit")
+                    if submitted:
+                        if action == "Confirm Close":
+                            df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
+                            df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = comment
+                            df.loc[df["Topic"] == row["Topic"], "Closed By"] = closed_by
+                            df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
+                            save_data(df)
+                            st.success(f"✅ '{row['Topic']}' marked as Closed.")
                         st.session_state.close_row = None
                         st.experimental_rerun()
 
-                if st.session_state.close_row == i:
-                    with st.form(f"close_form_{i}"):
-                        st.markdown("**🔒 Provide Closing Details**")
-                        comment = st.text_area("Closing Comment", key=f"comment_{i}")
-                        closed_by = st.text_input("Closed By", key=f"closed_by_{i}")
-                        action = st.radio("Action", ["Confirm Close", "Cancel"], key=f"close_action_{i}")
-                        submitted = st.form_submit_button("Submit")
-                        if submitted:
-                            if action == "Confirm Close":
-                                df.loc[df["Topic"] == row["Topic"], "Status"] = "Closed"
-                                df.loc[df["Topic"] == row["Topic"], "Closing Comment"] = comment
-                                df.loc[df["Topic"] == row["Topic"], "Closed By"] = closed_by
-                                df.loc[df["Topic"] == row["Topic"], "Actual Resolution Date"] = date.today().isoformat()
-                                save_data(df)
-                                st.success(f"✅ '{row['Topic']}' marked as Closed.")
-                            st.session_state.close_row = None
+            # Edit form UI
+            if st.session_state.edit_row == i:
+                with st.form(f"edit_form_{i}"):
+                    st.markdown("**✏️ Edit Topic Details**")
+                    new_topic = st.text_input("Topic", value=row["Topic"], key=f"edit_topic_{i}")
+                    new_owner = st.text_input("Owner", value=row["Owner"], key=f"edit_owner_{i}")
+                    new_status = st.text_input("Status", value=row["Status"], key=f"edit_status_{i}")
+                    new_date = st.date_input(
+                        "Target Resolution Date",
+                        value=safe_to_date(row["Target Resolution Date"]),
+                        key=f"edit_date_{i}"
+                    )
+                    action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
+                    submitted = st.form_submit_button("Submit")
 
-                if st.session_state.edit_row == i:
-                    with st.form(f"edit_form_{i}"):
-                        st.markdown("**✏️ Edit Topic Details**")
-                        new_topic = st.text_input("Topic", value=row["Topic"], key=f"edit_topic_{i}")
-                        new_owner = st.text_input("Owner", value=row["Owner"], key=f"edit_owner_{i}")
-                        new_status = st.text_input("Status", value=row["Status"], key=f"edit_status_{i}")
-                        new_date = st.date_input(
-                            "Target Resolution Date",
-                            value=safe_to_date(row["Target Resolution Date"]),
-                            key=f"edit_date_{i}"
-                        )
-                        action = st.radio("Action", ["Save Changes", "Cancel"], key=f"edit_action_{i}")
-                        submitted = st.form_submit_button("Submit")
+                    if submitted:
+                        if action == "Save Changes":
+                            df.loc[df["Topic"] == row["Topic"], "Topic"] = new_topic
+                            df.loc[df["Topic"] == new_topic, "Owner"] = new_owner
+                            df.loc[df["Topic"] == new_topic, "Status"] = new_status
+                            df.loc[df["Topic"] == new_topic, "Target Resolution Date"] = new_date
+                            save_data(df)
+                            st.success(f"✅ '{new_topic}' updated successfully.")
+                        st.session_state.edit_row = None
+                        st.experimental_rerun()
 
-                        if submitted:
-                            if action == "Save Changes":
-                                df.loc[df["Topic"] == row["Topic"], "Topic"] = new_topic
-                                df.loc[df["Topic"] == new_topic, "Owner"] = new_owner
-                                df.loc[df["Topic"] == new_topic, "Status"] = new_status
-                                df.loc[df["Topic"] == new_topic, "Target Resolution Date"] = new_date
-                                save_data(df)
-                                st.success(f"✅ '{new_topic}' updated successfully.")
-                            st.session_state.edit_row = None
+            st.markdown("</div>", unsafe_allow_html=True)
 
-                st.markdown("</div>", unsafe_allow_html=True)
+    # After rendering all rows, if a Close/Edit button was clicked, update session state & rerun once
+    if button_clicked:
+        action, idx = button_clicked
+        if action == "close":
+            st.session_state.close_row = idx
+            st.session_state.edit_row = None
+        elif action == "edit":
+            st.session_state.edit_row = idx
+            st.session_state.close_row = None
+        st.experimental_rerun()
 
-        csv = open_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="⬇️ Download Open Topics as CSV",
-            data=csv,
-            file_name='open_topics.csv',
-            mime='text/csv'
-        )
-    else:
-        st.info("No open topics available.")
+    # Download button for open topics CSV
+    csv = open_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="⬇️ Download Open Topics as CSV",
+        data=csv,
+        file_name='open_topics.csv',
+        mime='text/csv'
+    )
 
 def closed_topics():
     st.markdown("<h2 style='color:#0073e6;'>✅ Closed Topics</h2>", unsafe_allow_html=True)
